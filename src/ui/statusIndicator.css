@@ -1,0 +1,20 @@
+.status {
+  position: fixed;
+  right: 16px;
+  bottom: 12px;
+  z-index: 20;
+  color: var(--fg-faint);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  user-select: none;
+  pointer-events: auto;
+}
+
+.status[data-state='error'] {
+  color: var(--danger);
+}
+
+.status--warning::before {
+  content: '● ';
+  color: var(--danger);
+}
