@@ -55,22 +55,14 @@ export function plural(base: PluralBase, count: number, params: Record<string, s
   return t(key in en ? key : fallback, { count, ...params });
 }
 
-/** "Monday, November 23, 2026" in the current locale. */
-export function formatDayHeading(date: Date): string {
-  return new Intl.DateTimeFormat(current.tag, {
-    weekday: 'long',
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  }).format(date);
+const pad = (value: number): string => String(value).padStart(2, '0');
+
+/** Dates are always written YYYY-MM-DD, in every language. */
+export function formatDate(date: Date): string {
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}`;
 }
 
-/** "Nov 23" style short date, used in links to notes. */
-export function formatShortDate(date: Date): string {
-  return new Intl.DateTimeFormat(current.tag, { month: 'short', day: 'numeric' }).format(date);
-}
-
-/** Relative "last modified" style date and time. */
+/** "2026-11-23 14:52". */
 export function formatDateTime(date: Date): string {
-  return new Intl.DateTimeFormat(current.tag, { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+  return `${formatDate(date)} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
 }

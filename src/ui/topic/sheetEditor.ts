@@ -13,8 +13,10 @@ import type { Saver } from '../../sync/saver';
 import type { TagService } from '../../tags/tagService';
 
 const sheetTheme = EditorView.theme({
-  '.cm-content': { padding: '4px 0 8px' },
-  '.cm-placeholder': { color: 'var(--fg-faint)' },
+  // "&.cm-editor" outranks the shared theme, so the card's background shows through.
+  '&.cm-editor': { fontSize: '15px', backgroundColor: 'transparent' },
+  '.cm-content': { padding: '0', minHeight: 'calc(15px * 1.65 * 2)' },
+  '.cm-placeholder': { color: 'var(--fg-faint)', fontStyle: 'italic' },
 });
 
 /**
@@ -31,7 +33,7 @@ export function createSheetEditor(parent: HTMLElement, tags: TagService, saver: 
     state: EditorState.create({
       doc: body,
       extensions: [
-        baseEditing(),
+        baseEditing(true),
         sheetTheme,
         placeholder(t('topic.sheetPlaceholder', { tag: name })),
         tagContext.of(tags.editorContext()),

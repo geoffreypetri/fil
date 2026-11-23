@@ -23,6 +23,10 @@ your browser and makes no network request beyond loading the app.
 | Commands | `Ctrl+K`: filter by tag, open a tag sheet, tag settings, rename a tag, undo the last rename, go to a date, theme, language, notes folder, version. |
 | Place the cursor in a tag | `Alt`+click (a plain click opens the topic). |
 
+Days are headed by their date (`2026-11-23`) and each note's time is shown in a column to the
+left of its first line, outside the text: the `## 14:52` line stays in the file but is not
+displayed.
+
 The corner indicator shows `saved`, `saving…` or `error`; hover it for details (errors, conflict
 copies, alias conflicts).
 
@@ -178,7 +182,7 @@ How it works, in short:
 Interface strings live in `src/i18n/en.ts`, the reference and fallback. To add French, create
 `src/i18n/fr.ts` exporting a `Partial<Messages>`, then register it in `src/i18n/index.ts`
 (`fr: { tag: 'fr-FR', messages: fr }`). It then appears under *Language…* in the palette. Dates
-and times are formatted with `Intl` in the chosen language.
+are always written `YYYY-MM-DD`, whatever the language.
 
 ## Deployment
 

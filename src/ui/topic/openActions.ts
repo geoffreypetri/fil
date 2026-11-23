@@ -1,4 +1,4 @@
-import { formatShortDate, t } from '../../i18n';
+import { formatDate, t } from '../../i18n';
 import type { ActionRef } from '../../index/tagIndex';
 import { dateOfDayKey } from '../../model/paths';
 import { extractLineTags } from '../../model/tags';
@@ -76,7 +76,7 @@ export class OpenActions {
         checkbox.disabled = false;
       });
     });
-    const when = `${formatShortDate(dateOfDayKey(ref.day))}${ref.time ? ` ${ref.time}` : ''}`;
+    const when = `${formatDate(dateOfDayKey(ref.day))}${ref.time ? ` ${ref.time}` : ''}`;
     return h(
       'li',
       { class: `topic-actions__item${ref.action.done ? ' topic-actions__item--done' : ''}` },

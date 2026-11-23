@@ -7,13 +7,17 @@ const hidden = Decoration.replace({});
 const linkText = Decoration.mark({ class: 'cm-link-text' });
 const INLINE_MARKS = new Set(['EmphasisMark', 'StrikethroughMark']);
 
-/** Line numbers touched by the selection: their Markdown marks stay visible for editing. */
+/**
+ * Lines being edited: their Markdown marks stay visible. Only the cursor line counts (or a
+ * selection within one line), and only while the editor has focus, so selecting a large
+ * block (Ctrl+A) or leaving the editor never makes the layout jump.
+ */
 function activeLines(view: EditorView): Set<number> {
   const lines = new Set<number>();
+  if (!view.hasFocus) return lines;
   for (const range of view.state.selection.ranges) {
     const first = view.state.doc.lineAt(range.from).number;
-    const last = view.state.doc.lineAt(range.to).number;
-    for (let n = first; n <= last; n++) lines.add(n);
+    if (first === view.state.doc.lineAt(range.to).number) lines.add(first);
   }
   return lines;
 }
@@ -71,7 +75,7 @@ const livePreviewPlugin = ViewPlugin.fromClass(
       this.decorations = buildPreview(view);
     }
     update(update: ViewUpdate): void {
-      if (update.docChanged || update.viewportChanged || update.selectionSet) {
+      if (update.docChanged || update.viewportChanged || update.selectionSet || update.focusChanged) {
         this.decorations = buildPreview(update.view);
       }
     }

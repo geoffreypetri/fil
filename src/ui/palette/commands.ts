@@ -1,4 +1,4 @@
-import { availableLocales, formatDayHeading, setLocale, t } from '../../i18n';
+import { availableLocales, formatDate, setLocale, t } from '../../i18n';
 import type { Navigator } from '../../journal/navigator';
 import { nearestDay, parseDateQuery, todayKey } from '../../model/dateQuery';
 import { dateOfDayKey } from '../../model/paths';
@@ -121,7 +121,7 @@ function dateItem(deps: CommandDeps, query: string): PaletteItem | null {
   if (!day) return null;
   return {
     id: `date:${day}`,
-    label: t('command.goToDay', { date: formatDayHeading(dateOfDayKey(day)) }),
+    label: t('command.goToDay', { date: formatDate(dateOfDayKey(day)) }),
     run: () => goToDate(deps, day),
   };
 }

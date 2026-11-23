@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { formatDayHeading, registerLocale, setLocale, t } from '../src/i18n';
+import { formatDate, formatDateTime, registerLocale, setLocale, t } from '../src/i18n';
 
 describe('i18n', () => {
   afterEach(() => setLocale('en'));
@@ -20,12 +20,13 @@ describe('i18n', () => {
     expect(t('status.error')).toBe('error');
   });
 
-  it('formats day headings with Intl in the current locale', () => {
-    const date = new Date(2026, 10, 23);
-    expect(formatDayHeading(date)).toBe('Monday, November 23, 2026');
+  it('writes dates as YYYY-MM-DD in every language', () => {
+    const date = new Date(2026, 10, 3, 9, 5);
+    expect(formatDate(date)).toBe('2026-11-03');
+    expect(formatDateTime(date)).toBe('2026-11-03 09:05');
     registerLocale('xx', { tag: 'fr-FR', messages: {} });
     setLocale('xx');
-    expect(formatDayHeading(date)).toBe('lundi 23 novembre 2026');
+    expect(formatDate(date)).toBe('2026-11-03');
   });
 });
 

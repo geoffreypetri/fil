@@ -1,15 +1,9 @@
 import { RangeSetBuilder, StateField, type EditorState, type Extension } from '@codemirror/state';
-import {
-  Decoration,
-  EditorView,
-  ViewPlugin,
-  WidgetType,
-  type DecorationSet,
-  type ViewUpdate,
-} from '@codemirror/view';
-import { formatDayHeading } from '../i18n';
+import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
+import { formatDate } from '../i18n';
 import { parseTimeHeader } from '../model/dayParser';
 import { dateOfDayKey, type DayKey } from '../model/paths';
+import { SENTINEL } from '../model/segments';
 import { sentinelField } from './segmentField';
 
 class DaySeparatorWidget extends WidgetType {
@@ -26,7 +20,7 @@ class DaySeparatorWidget extends WidgetType {
     element.dataset.day = this.day;
     const label = document.createElement('div');
     label.className = 'cm-day-separator__label';
-    label.textContent = formatDayHeading(dateOfDayKey(this.day));
+    label.textContent = formatDate(dateOfDayKey(this.day));
     element.append(label);
     return element;
   }
@@ -81,48 +75,46 @@ const daySeparators = StateField.define<DecorationSet>({
   ],
 });
 
-const noteHeaderLine = Decoration.line({ class: 'cm-note-header' });
+const hiddenHeader = Decoration.replace({ block: true });
 
-function buildTimeHeaders(view: EditorView): { decorations: DecorationSet; atomic: DecorationSet } {
-  const builder = new RangeSetBuilder<Decoration>();
+/**
+ * "## 14:52" lines stay in the files but are not shown in the text: the time appears in a
+ * column to the left of the note's first line, outside the editable text. When a header has
+ * no line after it in its day, it is shown inline instead.
+ */
+function buildTimeHeaders(state: EditorState): { decorations: DecorationSet; atomic: DecorationSet } {
+  const decorations = new RangeSetBuilder<Decoration>();
   const atomic = new RangeSetBuilder<Decoration>();
-  for (const { from, to } of view.visibleRanges) {
-    let pos = from;
-    while (pos <= to) {
-      const line = view.state.doc.lineAt(pos);
-      const time = parseTimeHeader(line.text);
-      if (time !== null) {
-        builder.add(line.from, line.from, noteHeaderLine);
-        const replace = Decoration.replace({ widget: new TimeWidget(time) });
-        builder.add(line.from, line.to, replace);
-        atomic.add(line.from, line.to, replace);
-      }
-      pos = line.to + 1;
+  const { doc } = state;
+  for (let number = 1; number <= doc.lines; number++) {
+    const line = doc.line(number);
+    const time = parseTimeHeader(line.text);
+    if (time === null) continue;
+    const next = number < doc.lines ? doc.line(number + 1) : null;
+    if (!next || next.text.startsWith(SENTINEL)) {
+      const inline = Decoration.replace({ widget: new TimeWidget(time) });
+      decorations.add(line.from, line.to, inline);
+      atomic.add(line.from, line.to, inline);
+      continue;
     }
+    decorations.add(line.from, line.to, hiddenHeader);
+    decorations.add(next.from, next.from, Decoration.line({ class: 'cm-note-start', attributes: { 'data-time': time } }));
+    // The line break belongs to the header: deleting backwards from the note removes the time stamp.
+    atomic.add(line.from, next.from, hiddenHeader);
   }
-  return { decorations: builder.finish(), atomic: atomic.finish() };
+  return { decorations: decorations.finish(), atomic: atomic.finish() };
 }
 
-/** "## 14:52" lines are shown as a discreet, atomic time stamp. */
-const timeHeaders = ViewPlugin.fromClass(
-  class {
-    decorations: DecorationSet;
-    atomic: DecorationSet;
-    constructor(view: EditorView) {
-      ({ decorations: this.decorations, atomic: this.atomic } = buildTimeHeaders(view));
-    }
-    update(update: ViewUpdate): void {
-      if (update.docChanged || update.viewportChanged) {
-        ({ decorations: this.decorations, atomic: this.atomic } = buildTimeHeaders(update.view));
-      }
-    }
+const timeHeaders = StateField.define<{ decorations: DecorationSet; atomic: DecorationSet }>({
+  create: buildTimeHeaders,
+  update(value, tr) {
+    return tr.docChanged ? buildTimeHeaders(tr.state) : value;
   },
-  {
-    decorations: (plugin) => plugin.decorations,
-    provide: (plugin) =>
-      EditorView.atomicRanges.of((view) => view.plugin(plugin)?.atomic ?? Decoration.none),
-  },
-);
+  provide: (field) => [
+    EditorView.decorations.from(field, (value) => value.decorations),
+    EditorView.atomicRanges.of((view) => view.state.field(field).atomic),
+  ],
+});
 
 export function dayWidgets(): Extension {
   return [daySeparators, timeHeaders];

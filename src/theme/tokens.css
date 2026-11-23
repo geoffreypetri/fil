@@ -13,7 +13,7 @@
   --surface: #f6f8fa;
   --accent: #0969da;
   --danger: #cf222e;
-  --selection: #b6d7ff;
+  --selection: #d3e4fd;
 
   color-scheme: light;
 }
@@ -28,7 +28,7 @@
     --surface: #1d2025;
     --accent: #58a6ff;
     --danger: #ff7b72;
-    --selection: #264f78;
+    --selection: #2c4257;
     color-scheme: dark;
   }
 }
@@ -42,7 +42,7 @@
   --surface: #1d2025;
   --accent: #58a6ff;
   --danger: #ff7b72;
-  --selection: #264f78;
+  --selection: #2c4257;
   color-scheme: dark;
 }
 

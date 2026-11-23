@@ -1,7 +1,7 @@
 import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorState, type Extension, type Transaction } from '@codemirror/state';
-import { EditorView, drawSelection, keymap } from '@codemirror/view';
+import { EditorView, keymap } from '@codemirror/view';
 import { buildDocument, type DaySource } from '../model/segments';
 import { dayWidgets } from './dayWidgets';
 import { livePreview } from './livePreview';
@@ -17,15 +17,14 @@ export interface JournalEditorOptions {
 }
 
 /** Shared editing setup, also used by the tag sheet editor. */
-export function baseEditing(): Extension {
+export function baseEditing(compact = false): Extension {
   return [
     history(),
-    drawSelection(),
     EditorView.lineWrapping,
     markdown({ base: markdownLanguage }),
     keymap.of([...defaultKeymap, ...historyKeymap]),
     livePreview(),
-    editorTheme(),
+    editorTheme(compact),
   ];
 }
 
