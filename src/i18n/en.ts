@@ -17,6 +17,7 @@ export const en = {
   'setup.reconnectHint': 'The browser needs your permission again to open this folder.',
   'setup.otherFolder': 'Choose another folder',
   'setup.error': 'Could not open the folder: {message}',
+  'setup.install': 'Install Fil as an app',
 
   'status.saved': 'saved',
   'status.saving': 'saving…',
@@ -79,6 +80,7 @@ export const en = {
   'command.systemTheme': 'Use system theme',
   'command.language': 'Language…',
   'command.closeTopic': 'Close topic view',
+  'command.install': 'Install Fil as an app',
   'command.version': 'Fil {version}',
   'command.versionDetail': 'Version',
 

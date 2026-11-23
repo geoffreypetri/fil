@@ -3,6 +3,7 @@ import { setLocale, t } from './i18n';
 import { FsAccessStore } from './fs/fsAccessStore';
 import { loadFolder, pickFolder, requestFolderPermission } from './fs/handle';
 import type { FileStore } from './fs/store';
+import { listenForInstallPrompt } from './sw/install';
 import { registerServiceWorker } from './sw/registerSW';
 import { renderSetupScreen, renderUnsupportedScreen } from './ui/setupScreen';
 import { startApp } from './app';
@@ -73,6 +74,7 @@ function start(): void {
   if (!root) return;
   setLocale(storedLocale());
   applyStoredTheme();
+  listenForInstallPrompt();
   registerServiceWorker();
   if (!isBrowserSupported()) {
     renderUnsupportedScreen(root);

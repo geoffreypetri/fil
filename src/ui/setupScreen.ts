@@ -1,4 +1,5 @@
 import { t } from '../i18n';
+import { canInstall, onInstallAvailabilityChange, promptInstall } from '../sw/install';
 import { VERSION_LABEL } from '../version';
 import { h } from './dom';
 import './setupScreen.css';
@@ -31,6 +32,12 @@ export function renderSetupScreen(root: HTMLElement, options: SetupScreenOptions
   }
 
   const text = options.reconnectFolder ? t('setup.reconnectHint') : t('setup.tagline');
+  const install = h('button', { class: 'setup__link', onclick: () => void promptInstall() }, t('setup.install'));
+  const showInstall = (): void => {
+    install.hidden = !canInstall();
+  };
+  showInstall();
+  onInstallAvailabilityChange(showInstall);
 
   root.replaceChildren(
     h(
@@ -43,6 +50,7 @@ export function renderSetupScreen(root: HTMLElement, options: SetupScreenOptions
         h('p', { class: 'setup__text' }, text),
         actions,
         options.error ? h('p', { class: 'setup__error', role: 'alert' }, options.error) : null,
+        h('p', { class: 'setup__install' }, install),
         h('p', { class: 'setup__version' }, VERSION_LABEL),
       ),
     ),

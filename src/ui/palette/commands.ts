@@ -5,6 +5,7 @@ import { dateOfDayKey } from '../../model/paths';
 import { normalizeTag } from '../../model/tags';
 import type { RenameService } from '../../tags/renameService';
 import type { TagService } from '../../tags/tagService';
+import { canInstall, promptInstall } from '../../sw/install';
 import { setTheme, toggleTheme } from '../theme';
 import type { TopicView } from '../topic/topicView';
 import { VERSION_LABEL } from '../../version';
@@ -204,6 +205,9 @@ export function rootMode(deps: CommandDeps): PaletteMode {
       { id: 'system-theme', label: t('command.systemTheme'), run: () => setTheme('system') },
       { id: 'language', label: t('command.language'), run: () => languageMode(deps) },
       { id: 'folder', label: t('command.chooseFolder'), run: () => deps.chooseFolder() },
+      ...(canInstall()
+        ? [{ id: 'install', label: t('command.install'), run: () => void promptInstall() }]
+        : []),
       {
         id: 'version',
         label: t('command.version', { version: VERSION_LABEL }),
