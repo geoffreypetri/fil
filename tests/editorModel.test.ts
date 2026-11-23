@@ -139,3 +139,54 @@ describe('journal saving', () => {
     expect(tr.annotation(programmatic)).toBe(true);
   });
 });
+
+describe('progressive select all', () => {
+  const days = [
+    { day: '2026-11-22', content: '## 10:00\nyesterday' },
+    { day: '2026-11-23', content: '## 14:52\nfirst note\nsecond line\n\n## 16:10\nother note\n' },
+  ];
+
+  it('selects the note, then the day, then the whole journal', async () => {
+    const { nextScope } = await import('../src/editor/selectScope');
+    let state = makeState(days);
+    const cursor = state.doc.toString().indexOf('second line') + 3;
+    state = state.update({ selection: { anchor: cursor } }).state;
+    const steps: string[] = [];
+    for (let i = 0; i < 4; i++) {
+      const scope = nextScope(state);
+      if (!scope) {
+        steps.push('end');
+        break;
+      }
+      state = state.update({ selection: { anchor: scope.from, head: scope.to } }).state;
+      steps.push(state.sliceDoc(scope.from, scope.to).replaceAll('￼', '@'));
+    }
+    expect(steps).toEqual([
+      'first note\nsecond line',
+      '## 14:52\nfirst note\nsecond line\n\n## 16:10\nother note',
+      '## 10:00\nyesterday\n@2026-11-23\n## 14:52\nfirst note\nsecond line\n\n## 16:10\nother note\n',
+      'end',
+    ]);
+  });
+
+  it('skips scopes already covered by the selection', async () => {
+    const { nextScope } = await import('../src/editor/selectScope');
+    let state = makeState(days);
+    const from = state.doc.toString().indexOf('first note');
+    const to = from + 'first note\nsecond line'.length;
+    state = state.update({ selection: { anchor: from, head: to } }).state;
+    expect(state.sliceDoc(nextScope(state)!.from, nextScope(state)!.to).startsWith('## 14:52')).toBe(true);
+  });
+});
+
+describe('progressive select all with a single note', () => {
+  it('goes straight from the note to the whole journal when the day looks the same', async () => {
+    const { selectionScopes } = await import('../src/editor/selectScope');
+    const state = makeState([
+      { day: '2026-11-22', content: '## 10:00\nyesterday' },
+      { day: '2026-11-23', content: '## 14:52\nonly note' },
+    ]);
+    const scopes = selectionScopes(state).map((s) => state.sliceDoc(s.from, s.to).replaceAll('￼', '@'));
+    expect(scopes).toEqual(['## 14:52\nonly note', '## 10:00\nyesterday\n@2026-11-23\n## 14:52\nonly note']);
+  });
+});

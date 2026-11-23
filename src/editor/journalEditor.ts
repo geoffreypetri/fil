@@ -7,6 +7,7 @@ import { dayWidgets } from './dayWidgets';
 import { livePreview } from './livePreview';
 import { newNoteExtensions } from './newNote';
 import { segmentExtensions } from './segmentField';
+import { progressiveSelectAll } from './selectScope';
 import { editorTheme, journalLayout } from './theme';
 
 export interface JournalEditorOptions {
@@ -37,6 +38,7 @@ export function createJournalEditor(options: JournalEditorOptions): EditorView {
       segmentExtensions(),
       dayWidgets(),
       newNoteExtensions(),
+      progressiveSelectAll(),
       baseEditing(),
       journalLayout,
       EditorView.contentAttributes.of({ spellcheck: 'true', 'aria-label': 'Journal' }),

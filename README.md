@@ -20,6 +20,7 @@ your browser and makes no network request beyond loading the app.
 | Action | Start a line with `- [ ] `. It is shown as a checkbox. |
 | Topic view | Click a tag, or `Ctrl+K` then the tag. `Shift`+click (or `Shift+Enter` in the palette) combines tags with AND. |
 | Back to the journal | `Esc` |
+| Select | `Ctrl+A` selects the current note; press again for the whole day, then the whole journal. |
 | Commands | `Ctrl+K`: filter by tag, open a tag sheet, tag settings, rename a tag, undo the last rename, go to a date, theme, language, notes folder, version. |
 | Place the cursor in a tag | `Alt`+click (a plain click opens the topic). |
 
