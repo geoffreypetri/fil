@@ -1,5 +1,8 @@
 import { EditorView } from '@codemirror/view';
+import { fromDisk } from '../../editor/segmentField';
 import { setTopicTags } from '../../editor/topicFilter';
+import { parseSheet } from '../../model/frontmatter';
+import { tagSheetPath } from '../../model/paths';
 import type { FileStore } from '../../fs/store';
 import { formatDateTime, t } from '../../i18n';
 import type { ActionRef } from '../../index/tagIndex';
@@ -89,6 +92,22 @@ export class TopicView {
       view.dispatch({ effects: setTopicTags.of(names) });
       view.dispatch({ effects: EditorView.scrollIntoView(view.state.doc.length, { y: 'end' }) });
     }
+  }
+
+  /** Shows a sheet changed on disk, unless it has local edits waiting to be saved. */
+  reloadSheet(name: string): void {
+    if (!this.sheet || this.tagsValue?.length !== 1 || this.tagsValue[0] !== name) return;
+    if (this.deps.saver.isPending(tagSheetPath(name))) return;
+    const text = this.deps.tags.sheetText(name);
+    const body = text === null ? '' : parseSheet(text).body;
+    const current = this.sheet.state.doc.toString();
+    if (body !== current) {
+      this.sheet.dispatch({
+        changes: { from: 0, to: current.length, insert: body },
+        annotations: fromDisk.of(true),
+      });
+    }
+    this.renderHeader();
   }
 
   focusSheet(): void {

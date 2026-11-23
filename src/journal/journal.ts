@@ -24,10 +24,40 @@ export class Journal {
     throw new Error('Journal is not attached to an editor');
   };
 
+  /** Every day that has a file, oldest first. */
+  private available: DayKey[] = [];
+
   constructor(
     private readonly store: FileStore,
     private readonly saver: Saver,
   ) {}
+
+  setAvailableDays(days: readonly DayKey[]): void {
+    this.available = [...days].sort();
+  }
+
+  /** Earliest day currently in the editor. */
+  earliestLoaded(): DayKey | null {
+    return segmentsOf(this.state())[0]?.day ?? null;
+  }
+
+  /** The `count` days with files just before the earliest loaded day. */
+  olderDays(count: number): DayKey[] {
+    const earliest = this.earliestLoaded();
+    if (earliest === null) return [];
+    const loaded = this.loadedDays();
+    return this.available.filter((day) => day < earliest && !loaded.has(day)).slice(-count);
+  }
+
+  hasOlderDays(): boolean {
+    return this.olderDays(1).length > 0;
+  }
+
+  /** Whether a day that just appeared on disk belongs to the loaded range. */
+  shouldShowNewDay(day: DayKey): boolean {
+    const earliest = this.earliestLoaded();
+    return earliest !== null && day >= earliest;
+  }
 
   attach(getState: () => EditorState): void {
     this.state = getState;
@@ -51,6 +81,7 @@ export class Journal {
 
   /** The most recent `count` day files, plus an empty segment for today when it has no file. */
   async initialDays(scan: FolderScan, today: DayKey, count = INITIAL_DAYS): Promise<DaySource[]> {
+    this.setAvailableDays(scan.days.map((d) => d.day));
     const existing = scan.days.filter((d) => d.day <= today).slice(-count).map((d) => d.day);
     if (scan.days.some((d) => d.day === today) && !existing.includes(today)) existing.push(today);
     const sources = await this.readDays(existing);

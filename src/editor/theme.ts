@@ -21,7 +21,9 @@ const baseTheme = EditorView.theme({
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection':
     { backgroundColor: 'var(--selection) !important' },
   '.cm-day-separator': {
-    margin: '48px 0 12px',
+    padding: '48px 0 12px',
+  },
+  '.cm-day-separator__label': {
     paddingBottom: '6px',
     borderBottom: '1px solid var(--border)',
     color: 'var(--fg-muted)',

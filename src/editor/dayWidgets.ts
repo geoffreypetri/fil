@@ -20,10 +20,14 @@ class DaySeparatorWidget extends WidgetType {
     return other.day === this.day;
   }
   toDOM(): HTMLElement {
+    // Padding rather than margins: CodeMirror measures block widgets by their border box.
     const element = document.createElement('div');
     element.className = 'cm-day-separator';
     element.dataset.day = this.day;
-    element.textContent = formatDayHeading(dateOfDayKey(this.day));
+    const label = document.createElement('div');
+    label.className = 'cm-day-separator__label';
+    label.textContent = formatDayHeading(dateOfDayKey(this.day));
+    element.append(label);
     return element;
   }
   override ignoreEvent(): boolean {

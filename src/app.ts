@@ -11,11 +11,13 @@ import { buildIndex } from './index/indexBuilder';
 import { TagIndex } from './index/tagIndex';
 import { Journal } from './journal/journal';
 import { Navigator } from './journal/navigator';
+import { ProgressiveLoader } from './journal/progressiveLoader';
 import { scanFolder } from './model/folderScan';
 import { paletteCss } from './model/palette';
 import { dayKeyOf } from './model/paths';
 import { Saver } from './sync/saver';
 import { StatusHub } from './sync/status';
+import { ExternalWatcher } from './sync/watcher';
 import { RenameService } from './tags/renameService';
 import { TagService } from './tags/tagService';
 import { CommandPalette } from './ui/palette/commandPalette';
@@ -174,7 +176,27 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     disposers.push(() => view.destroy());
     disposers.push(tags.onTableChange(() => view.dispatch({ effects: refreshTags.of(null) })));
 
+    const loader = new ProgressiveLoader(journal, view);
+    loader.start();
+    disposers.push(() => loader.stop());
+
     await buildIndex(store, scan, tags.index, cache);
+
+    const watcher = new ExternalWatcher({
+      store,
+      saver,
+      journal,
+      tags,
+      status,
+      dispatch: (spec) => {
+        if (spec) view.dispatch(spec);
+      },
+      onSheetChanged: (name) => topic.reloadSheet(name),
+      today: () => dayKeyOf(new Date()),
+    });
+    watcher.start();
+    disposers.push(() => watcher.stop());
+    await watcher.check();
   })().catch((error: unknown) => {
     status.set('load', 'error', [error instanceof Error ? error.message : String(error)]);
   });

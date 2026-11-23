@@ -1,6 +1,7 @@
 import { EditorState } from '@codemirror/state';
 import { EditorView, placeholder } from '@codemirror/view';
 import { checkboxes } from '../../editor/checkboxes';
+import { fromDisk } from '../../editor/segmentField';
 import { baseEditing } from '../../editor/journalEditor';
 import { tagAutocomplete } from '../../editor/tagAutocomplete';
 import { tagContext } from '../../editor/tagContext';
@@ -39,7 +40,7 @@ export function createSheetEditor(parent: HTMLElement, tags: TagService, saver: 
         checkboxes(),
         EditorView.contentAttributes.of({ 'aria-label': t('topic.sheetPlaceholder', { tag: name }) }),
         EditorView.updateListener.of((update) => {
-          if (!update.docChanged) return;
+          if (!update.docChanged || update.transactions.every((tr) => tr.annotation(fromDisk))) return;
           saver.schedule(path, () => {
             const current = tags.sheetText(name);
             const nextBody = view.state.doc.toString();
