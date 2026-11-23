@@ -1,14 +1,11 @@
 import { EditorView } from '@codemirror/view';
-import { segmentsOf } from '../../editor/segmentField';
-import { revealNotes, setTopicTags } from '../../editor/topicFilter';
+import { setTopicTags } from '../../editor/topicFilter';
 import type { FileStore } from '../../fs/store';
 import { formatDateTime, t } from '../../i18n';
 import type { ActionRef } from '../../index/tagIndex';
 import { setActionDone } from '../../journal/actionToggle';
 import type { Journal } from '../../journal/journal';
-import { parseTimeHeader } from '../../model/dayParser';
-import type { DayKey } from '../../model/paths';
-import { SENTINEL } from '../../model/segments';
+import type { Navigator } from '../../journal/navigator';
 import type { Saver } from '../../sync/saver';
 import type { StatusHub } from '../../sync/status';
 import type { TagService } from '../../tags/tagService';
@@ -24,6 +21,7 @@ export interface TopicViewDeps {
   readonly journal: Journal;
   readonly tags: TagService;
   readonly status: StatusHub;
+  readonly navigator: Navigator;
   view(): EditorView | null;
   openSettings(name: string): void;
 }
@@ -44,7 +42,7 @@ export class TopicView {
     this.actions = new OpenActions({
       tags: deps.tags,
       onToggle: (ref, done) => this.toggle(ref, done),
-      onGoTo: (ref) => void this.goTo(ref.day, ref.action.line),
+      onGoTo: (ref) => void deps.navigator.goToLine(ref.day, ref.action.line),
     });
     deps.host.hidden = true;
     deps.host.append(
@@ -93,6 +91,10 @@ export class TopicView {
     }
   }
 
+  focusSheet(): void {
+    this.sheet?.focus();
+  }
+
   /** Adds a tag to the current topic (AND), or opens it alone. */
   async add(tag: string): Promise<void> {
     await this.open([...(this.tagsValue ?? []), tag]);
@@ -123,15 +125,7 @@ export class TopicView {
     const missing = [
       ...new Set(this.deps.tags.index.notesWith(names, this.deps.tags.resolve).map((n) => n.day)),
     ].filter((day) => !loaded.has(day));
-    await this.loadDays(missing);
-  }
-
-  private async loadDays(days: readonly DayKey[]): Promise<void> {
-    if (days.length === 0) return;
-    const sources = await this.deps.journal.readDays(days);
-    const spec = this.deps.journal.insertDaysSpec(sources);
-    const view = this.deps.view();
-    if (spec && view) view.dispatch(spec);
+    await this.deps.navigator.loadDays(missing);
   }
 
   private renderHeader(): void {
@@ -190,34 +184,6 @@ export class TopicView {
     } catch (error) {
       this.deps.status.set('actions', 'error', [error instanceof Error ? error.message : String(error)]);
       return false;
-    }
-  }
-
-  /** Scrolls the journal to a line of a day file, revealing it if it is folded. */
-  async goTo(day: DayKey, fileLine: number): Promise<void> {
-    await this.loadDays([day]);
-    const view = this.deps.view();
-    if (!view) return;
-    const segment = segmentsOf(view.state).find((s) => s.day === day);
-    if (!segment) return;
-    const { doc } = view.state;
-    const lineNumber = Math.min(doc.lineAt(segment.from).number + fileLine, doc.lineAt(segment.to).number);
-    const pos = doc.line(lineNumber).from;
-    view.dispatch({
-      effects: [revealNotes.of([pos, ...this.noteStartsAround(view, pos)]), EditorView.scrollIntoView(pos, { y: 'center' })],
-      selection: { anchor: pos },
-    });
-    view.focus();
-  }
-
-  /** Start of the note containing `pos` (so revealing it unfolds the whole note). */
-  private noteStartsAround(view: EditorView, pos: number): number[] {
-    const { doc } = view.state;
-    for (let line = doc.lineAt(pos); ; line = doc.line(line.number - 1)) {
-      if (parseTimeHeader(line.text) !== null) return [line.from];
-      // Text before the first time stamp of a day is an untimed note starting after the separator.
-      if (line.text.startsWith(SENTINEL)) return [Math.min(line.to + 1, doc.length)];
-      if (line.number === 1) return [];
     }
   }
 }

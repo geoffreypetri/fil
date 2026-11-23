@@ -83,6 +83,17 @@ export class Journal {
     return { changes, annotations: [programmatic.of(true), fromDisk.of(true)] };
   }
 
+  /** Builds the transaction replacing a loaded day with new content from disk, or null. */
+  replaceDaySpec(day: DayKey, content: string): TransactionSpec | null {
+    const segment = segmentsOf(this.state()).find((s) => s.day === day);
+    if (!segment) return null;
+    if (this.state().doc.sliceString(segment.from, segment.to) === content) return null;
+    return {
+      changes: { from: segment.from, to: segment.to, insert: content },
+      annotations: [programmatic.of(true), fromDisk.of(true)],
+    };
+  }
+
   /** Called for every editor transaction. */
   handleTransaction(tr: Transaction): void {
     if (!tr.docChanged || tr.annotation(fromDisk)) return;

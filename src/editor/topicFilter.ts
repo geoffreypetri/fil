@@ -1,6 +1,6 @@
 import { StateEffect, StateField, type EditorState, type Extension, Prec } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
-import { t } from '../i18n';
+import { plural, t } from '../i18n';
 import { parseNotes } from '../model/dayParser';
 import { extractTagsByLine } from '../model/tags';
 import { segmentsOf } from './segmentField';
@@ -104,7 +104,7 @@ class HiddenNotesWidget extends WidgetType {
     const element = document.createElement('div');
     element.className = this.count > 0 ? 'cm-hidden-notes' : 'cm-hidden-notes cm-hidden-notes--empty';
     if (this.count > 0) {
-      element.textContent = t(this.count === 1 ? 'topic.hiddenOne' : 'topic.hiddenMany', { count: this.count });
+      element.textContent = plural('topic.hidden', this.count);
       element.setAttribute('role', 'button');
       element.title = t('topic.reveal');
       element.addEventListener('mousedown', (event) => {

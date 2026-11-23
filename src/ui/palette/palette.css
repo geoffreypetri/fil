@@ -1,0 +1,77 @@
+.dialog.palette {
+  width: min(560px, calc(100vw - 32px));
+  margin-top: 14vh;
+  overflow: hidden;
+}
+
+.palette__body {
+  display: flex;
+  flex-direction: column;
+}
+
+.palette__input {
+  padding: 14px 16px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  font-size: 16px;
+  outline: none;
+}
+
+.palette__list {
+  max-height: 50vh;
+  margin: 0;
+  padding: 6px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.palette__item {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.palette__item--selected {
+  background: var(--surface);
+}
+
+.palette__label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__label.tag-pill {
+  padding: 0 6px;
+}
+
+.palette__detail {
+  flex-shrink: 0;
+  max-width: 50%;
+  overflow: hidden;
+  color: var(--fg-faint);
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.palette__empty {
+  padding: 10px;
+  color: var(--fg-faint);
+  font-size: 14px;
+}
+
+.palette__hint {
+  padding: 6px 16px 8px;
+  border-top: 1px solid var(--border);
+  color: var(--fg-faint);
+  font-size: 12px;
+}

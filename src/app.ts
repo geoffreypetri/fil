@@ -10,12 +10,17 @@ import { IdbIndexCache } from './index/cache';
 import { buildIndex } from './index/indexBuilder';
 import { TagIndex } from './index/tagIndex';
 import { Journal } from './journal/journal';
+import { Navigator } from './journal/navigator';
 import { scanFolder } from './model/folderScan';
 import { paletteCss } from './model/palette';
 import { dayKeyOf } from './model/paths';
 import { Saver } from './sync/saver';
 import { StatusHub } from './sync/status';
+import { RenameService } from './tags/renameService';
 import { TagService } from './tags/tagService';
+import { CommandPalette } from './ui/palette/commandPalette';
+import { rootMode } from './ui/palette/commands';
+import { openRenameDialog } from './ui/renameDialog';
 import { h } from './ui/dom';
 import { mountStatusIndicator } from './ui/statusIndicator';
 import { openSettingsPanel } from './ui/topic/settingsPanel';
@@ -33,6 +38,8 @@ export interface AppContext {
   readonly journal: Journal;
   readonly tags: TagService;
   readonly topic: TopicView;
+  readonly rename: RenameService;
+  readonly palette: CommandPalette;
   view: EditorView | null;
   openSettings(name: string): void;
 }
@@ -49,6 +56,7 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     status.set('tags', 'saved', messages),
   );
   const journal = new Journal(store, saver);
+  const navigator = new Navigator(journal, () => context.view);
 
   const editorHost = h('div', { class: 'app__editor' });
   const topicHost = h('div', { class: 'topic' });
@@ -66,21 +74,73 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     journal,
     tags,
     status,
+    navigator,
     view: () => context.view,
     openSettings,
   });
-  const context: AppContext = { store, status, saver, journal, tags, topic, view: null, openSettings };
   tags.openTag = (name, add) => void (add ? topic.add(name) : topic.open([name]));
   disposers.push(() => topic.destroy());
 
+  const rename = new RenameService({
+    store,
+    saver,
+    tags,
+    journal,
+    view: () => context.view,
+    onRenamed: (from, to) => {
+      const current = topic.tags;
+      if (current?.includes(from)) void topic.open(current.map((name) => (name === from ? to : name)));
+    },
+  });
+  const focusEditor = (): void => {
+    if (!document.querySelector('dialog[open]')) context.view?.focus();
+  };
+  const palette: CommandPalette = new CommandPalette(
+    () =>
+      rootMode({
+        tags,
+        topic,
+        navigator,
+        rename,
+        chooseFolder: () => options.onChangeFolder(),
+        openSettings,
+        openRename: (name) => openRenameDialog(rename, name, () => undefined, focusEditor),
+        focusSheet: () => topic.focusSheet(),
+        report: (message, isError) => status.set('palette', isError ? 'error' : 'saved', [message]),
+        onLocaleChange: () => {
+          void saver.flush().then(() => location.reload());
+        },
+      }),
+    focusEditor,
+  );
+  const context: AppContext = {
+    store,
+    status,
+    saver,
+    journal,
+    tags,
+    topic,
+    rename,
+    palette,
+    view: null,
+    openSettings,
+  };
+
   const onKeyDown = (event: KeyboardEvent): void => {
+    if ((event.ctrlKey || event.metaKey) && !event.altKey && event.key.toLowerCase() === 'k') {
+      event.preventDefault();
+      event.stopPropagation();
+      if (palette.isOpen()) palette.close();
+      else if (!document.querySelector('dialog[open]')) palette.open();
+      return;
+    }
     if (event.key === 'Escape' && !event.defaultPrevented && topic.isOpen() && !document.querySelector('dialog[open]')) {
       event.preventDefault();
       topic.close();
     }
   };
-  window.addEventListener('keydown', onKeyDown);
-  disposers.push(() => window.removeEventListener('keydown', onKeyDown));
+  window.addEventListener('keydown', onKeyDown, true);
+  disposers.push(() => window.removeEventListener('keydown', onKeyDown, true));
 
   const flush = (): void => void saver.flush();
   const onVisibility = (): void => {
@@ -119,7 +179,6 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     status.set('load', 'error', [error instanceof Error ? error.message : String(error)]);
   });
 
-  void options;
   if (import.meta.env.DEV) (window as unknown as { fil: AppContext }).fil = context;
   return () => {
     flush();

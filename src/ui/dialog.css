@@ -140,3 +140,16 @@
   color: var(--tag-fg);
   background: var(--tag-bg);
 }
+
+.rename__mode {
+  align-items: flex-start;
+}
+
+.rename__mode input {
+  margin-top: 5px;
+}
+
+.rename__preview {
+  margin: 0;
+  font-size: 13px;
+}

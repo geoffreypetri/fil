@@ -6,6 +6,7 @@ import type { FileStore } from './fs/store';
 import { registerServiceWorker } from './sw/registerSW';
 import { renderSetupScreen, renderUnsupportedScreen } from './ui/setupScreen';
 import { startApp } from './app';
+import { applyStoredTheme } from './ui/theme';
 
 export function isBrowserSupported(): boolean {
   return typeof window !== 'undefined' && typeof window.showDirectoryPicker === 'function';
@@ -59,10 +60,19 @@ async function boot(root: HTMLElement): Promise<void> {
   else showSetup();
 }
 
+function storedLocale(): string {
+  try {
+    return localStorage.getItem('fil.locale') ?? 'en';
+  } catch {
+    return 'en';
+  }
+}
+
 function start(): void {
   const root = document.getElementById('app');
   if (!root) return;
-  setLocale('en');
+  setLocale(storedLocale());
+  applyStoredTheme();
   registerServiceWorker();
   if (!isBrowserSupported()) {
     renderUnsupportedScreen(root);

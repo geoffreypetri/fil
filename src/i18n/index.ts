@@ -41,6 +41,20 @@ export function t(key: MessageKey, params: Record<string, string | number> = {})
   );
 }
 
+type PluralBase = MessageKey extends infer K
+  ? K extends `${infer B}.other`
+    ? B
+    : never
+  : never;
+
+/** Picks "<base>.one" / "<base>.other"… with Intl plural rules and fills {count}. */
+export function plural(base: PluralBase, count: number, params: Record<string, string | number> = {}): string {
+  const rule = new Intl.PluralRules(current.tag).select(count);
+  const key = `${base}.${rule}` as MessageKey;
+  const fallback = `${base}.other` as MessageKey;
+  return t(key in en ? key : fallback, { count, ...params });
+}
+
 /** "Monday, November 23, 2026" in the current locale. */
 export function formatDayHeading(date: Date): string {
   return new Intl.DateTimeFormat(current.tag, {
