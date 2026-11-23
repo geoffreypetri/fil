@@ -23,6 +23,8 @@ export const en = {
   'status.error': 'error',
 
   'version.label': 'Version {version}',
+
+  'tags.aliasHint': 'alias #{alias}',
 } as const;
 
 export type MessageKey = keyof typeof en;
