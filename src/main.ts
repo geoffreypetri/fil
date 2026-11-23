@@ -47,6 +47,12 @@ async function boot(root: HTMLElement): Promise<void> {
     });
   };
 
+  // Development only: ?opfs uses the browser's private file system instead of a picked folder.
+  if (import.meta.env.DEV && new URLSearchParams(location.search).has('opfs')) {
+    open(new FsAccessStore(await navigator.storage.getDirectory()));
+    return;
+  }
+
   const state = await loadFolder().catch(() => ({ kind: 'none' }) as const);
   if (state.kind === 'granted') open(new FsAccessStore(state.handle));
   else if (state.kind === 'needsPermission') showSetup(state.handle);

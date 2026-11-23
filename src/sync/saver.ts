@@ -12,9 +12,12 @@ export interface SaverOptions {
   onConflictCopy?: (path: string, copyPath: string) => void;
 }
 
+/** Returns the text to write, or null to skip (e.g. an empty day that has no file yet). */
+export type TextSource = () => string | null;
+
 interface Pending {
   timer: ReturnType<typeof setTimeout> | null;
-  getText: () => string;
+  getText: TextSource;
 }
 
 interface Known {
@@ -61,7 +64,7 @@ export class Saver {
     return this.pending.size > 0 || this.inFlight.size > 0;
   }
 
-  schedule(path: string, getText: () => string): void {
+  schedule(path: string, getText: TextSource): void {
     const existing = this.pending.get(path);
     if (existing?.timer) clearTimeout(existing.timer);
     const entry: Pending = { getText, timer: null };
@@ -93,7 +96,12 @@ export class Saver {
     if (entry.timer) clearTimeout(entry.timer);
     this.pending.delete(path);
 
-    const task = this.write(path, entry.getText());
+    const text = entry.getText();
+    if (text === null) {
+      this.report();
+      return;
+    }
+    const task = this.write(path, text);
     this.inFlight.set(path, task);
     this.report();
     try {
@@ -112,6 +120,7 @@ export class Saver {
   private async write(path: string, text: string): Promise<void> {
     const disk = await this.store.stat(path);
     const known = this.known.get(path);
+    if (disk && known && disk.lastModified === known.lastModified && known.text === text) return;
     if (disk && disk.lastModified !== known?.lastModified) {
       const current = await this.store.read(path);
       if (current.text !== text && current.text !== known?.text) {
