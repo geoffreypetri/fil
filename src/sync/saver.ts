@@ -81,6 +81,14 @@ export class Saver {
     this.report();
   }
 
+  /** Writes a file now (with the same conflict checks), replacing any scheduled write. */
+  async writeNow(path: string, text: string): Promise<void> {
+    this.schedule(path, () => text);
+    await this.run(path);
+    const error = this.failed.get(path);
+    if (error) throw new Error(error);
+  }
+
   /** Writes every pending file now. */
   async flush(): Promise<void> {
     const paths = [...this.pending.keys()];
