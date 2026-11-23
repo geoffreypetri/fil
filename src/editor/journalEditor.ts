@@ -4,6 +4,7 @@ import { EditorState, type Extension, type Transaction } from '@codemirror/state
 import { EditorView, drawSelection, keymap } from '@codemirror/view';
 import { buildDocument, type DaySource } from '../model/segments';
 import { dayWidgets } from './dayWidgets';
+import { livePreview } from './livePreview';
 import { newNoteExtensions } from './newNote';
 import { segmentExtensions } from './segmentField';
 import { editorTheme, journalLayout } from './theme';
@@ -23,6 +24,7 @@ export function baseEditing(): Extension {
     EditorView.lineWrapping,
     markdown({ base: markdownLanguage }),
     keymap.of([...defaultKeymap, ...historyKeymap]),
+    livePreview(),
     editorTheme(),
   ];
 }

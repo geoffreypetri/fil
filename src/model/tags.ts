@@ -73,10 +73,6 @@ export function extractLineTags(line: string): TagMatch[] {
   return result;
 }
 
-export function isFenceLine(line: string): boolean {
-  return FENCE.test(line);
-}
-
 /** For each line, whether it belongs to a fenced code block (fence lines included). */
 export function codeLines(lines: readonly string[]): boolean[] {
   let fence: string | null = null;

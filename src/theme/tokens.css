@@ -71,3 +71,22 @@ body {
 button {
   font: inherit;
 }
+
+/* Discreet scrollbars. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+
+::selection {
+  background: var(--selection);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cm-hidden-notes,
+  .topic-actions__link,
+  .topic-actions__more,
+  .palette__item {
+    transition: color 100ms ease, background-color 100ms ease;
+  }
+}

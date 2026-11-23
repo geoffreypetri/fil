@@ -165,3 +165,8 @@
   color: var(--fg-faint);
   font-size: 14px;
 }
+
+/* In the topic view, the history starts right under the topic panel. */
+:root[data-topic] .app__editor .cm-content {
+  padding-top: 8px;
+}

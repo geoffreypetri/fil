@@ -31,6 +31,9 @@ export default defineConfig(({ command, isPreview }) => {
     build: {
       target: 'es2022',
       sourcemap: true,
+      // One ~240 kB (gzip) bundle, mostly CodeMirror; cached by the service worker after the
+      // first visit, so splitting it would not speed anything up.
+      chunkSizeWarningLimit: 800,
     },
     plugins: [
       VitePWA({

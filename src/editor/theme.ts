@@ -34,6 +34,7 @@ const baseTheme = EditorView.theme({
     userSelect: 'none',
   },
   '.cm-note-header': { paddingTop: '14px !important' },
+  '.cm-link-text': { color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: '2px' },
   '.cm-tag': {
     color: 'var(--tag-fg)',
     backgroundColor: 'var(--tag-bg)',
