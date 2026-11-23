@@ -6,7 +6,7 @@ import { buildDocument, type DaySource } from '../model/segments';
 import { dayWidgets } from './dayWidgets';
 import { newNoteExtensions } from './newNote';
 import { segmentExtensions } from './segmentField';
-import { editorTheme } from './theme';
+import { editorTheme, journalLayout } from './theme';
 
 export interface JournalEditorOptions {
   parent: HTMLElement;
@@ -37,6 +37,7 @@ export function createJournalEditor(options: JournalEditorOptions): EditorView {
       dayWidgets(),
       newNoteExtensions(),
       baseEditing(),
+      journalLayout,
       EditorView.contentAttributes.of({ spellcheck: 'true', 'aria-label': 'Journal' }),
       options.extensions ?? [],
     ],

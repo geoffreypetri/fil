@@ -45,15 +45,18 @@ const tagHighlighter = ViewPlugin.fromClass(
   { decorations: (plugin) => plugin.decorations },
 );
 
-/** Clicking a tag opens its topic view. Alt+click places the cursor instead. */
+/**
+ * Clicking a tag opens its topic view; Shift+click adds it to the current topic (AND).
+ * Alt+click places the cursor in the tag instead.
+ */
 const tagClicks = EditorView.domEventHandlers({
   mousedown(event, view) {
-    if (event.button !== 0 || event.altKey || event.shiftKey || event.metaKey || event.ctrlKey) return false;
+    if (event.button !== 0 || event.altKey || event.metaKey || event.ctrlKey) return false;
     const target = (event.target as HTMLElement | null)?.closest<HTMLElement>('.cm-tag');
     const name = target?.dataset.tag;
     if (!name) return false;
     event.preventDefault();
-    view.state.facet(tagContext).openTag(name);
+    view.state.facet(tagContext).openTag(name, event.shiftKey);
     return true;
   },
 });

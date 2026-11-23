@@ -1,8 +1,11 @@
 .app {
   position: relative;
+  display: flex;
+  flex-direction: column;
   height: 100%;
 }
 
 .app__editor {
-  height: 100%;
+  flex: 1 1 0;
+  min-height: 0;
 }

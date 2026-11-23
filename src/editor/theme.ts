@@ -6,7 +6,6 @@ import { tags } from '@lezer/highlight';
 /** Layout and colors come from CSS variables so light and dark themes share one definition. */
 const baseTheme = EditorView.theme({
   '&': {
-    height: '100%',
     color: 'var(--fg)',
     backgroundColor: 'var(--bg)',
     fontSize: '16px',
@@ -15,14 +14,8 @@ const baseTheme = EditorView.theme({
   '.cm-scroller': {
     fontFamily: 'var(--font-text)',
     lineHeight: '1.65',
-    overflowAnchor: 'none',
   },
-  '.cm-content': {
-    maxWidth: 'var(--column-width)',
-    margin: '0 auto',
-    padding: '20vh 32px 40vh',
-    caretColor: 'var(--fg)',
-  },
+  '.cm-content': { caretColor: 'var(--fg)' },
   '.cm-line': { padding: '0' },
   '.cm-cursor, .cm-dropCursor': { borderLeftColor: 'var(--fg)', borderLeftWidth: '2px' },
   '&.cm-focused > .cm-scroller > .cm-selectionLayer .cm-selectionBackground, .cm-selectionBackground, ::selection':
@@ -78,6 +71,16 @@ const baseTheme = EditorView.theme({
     color: 'var(--fg)',
   },
   '.cm-completionDetail': { color: 'var(--fg-faint)', fontStyle: 'normal', marginLeft: '8px' },
+  '.cm-hidden-notes': {
+    padding: '2px 0',
+    color: 'var(--fg-faint)',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '11px',
+    cursor: 'pointer',
+    userSelect: 'none',
+  },
+  '.cm-hidden-notes:hover': { color: 'var(--accent)' },
+  '.cm-hidden-notes--empty': { height: '0', padding: '0' },
   '.cm-note-time': {
     color: 'var(--fg-faint)',
     fontFamily: 'var(--font-mono)',
@@ -99,6 +102,17 @@ const markdownHighlight = HighlightStyle.define([
   { tag: tags.quote, color: 'var(--fg-muted)' },
   { tag: [tags.processingInstruction, tags.meta, tags.contentSeparator], color: 'var(--fg-faint)' },
 ]);
+
+/** Layout of the full-screen journal: centered column, generous margins. */
+export const journalLayout = EditorView.theme({
+  '&': { height: '100%' },
+  '.cm-scroller': { overflowAnchor: 'none' },
+  '.cm-content': {
+    maxWidth: 'var(--column-width)',
+    margin: '0 auto',
+    padding: '20vh 32px 40vh',
+  },
+});
 
 export function editorTheme(): Extension {
   return [baseTheme, syntaxHighlighting(markdownHighlight)];

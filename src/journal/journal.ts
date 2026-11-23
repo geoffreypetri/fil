@@ -1,9 +1,15 @@
-import type { Transaction } from '@codemirror/state';
+import type { Transaction, TransactionSpec } from '@codemirror/state';
 import type { FileStore } from '../fs/store';
 import type { FolderScan } from '../model/folderScan';
 import { dayPath, type DayKey } from '../model/paths';
-import { contentToFileText, daysInRanges, fileTextToContent, type DaySource } from '../model/segments';
-import { fromDisk, segmentContentOf, segmentsOf } from '../editor/segmentField';
+import {
+  contentToFileText,
+  daysInRanges,
+  fileTextToContent,
+  segmentText,
+  type DaySource,
+} from '../model/segments';
+import { fromDisk, programmatic, segmentContentOf, segmentsOf } from '../editor/segmentField';
 import type { EditorState } from '@codemirror/state';
 import type { Saver } from '../sync/saver';
 
@@ -50,6 +56,31 @@ export class Journal {
     const sources = await this.readDays(existing);
     if (!sources.some((s) => s.day === today)) sources.push({ day: today, content: '' });
     return sources;
+  }
+
+  /** Days currently loaded in the editor. */
+  loadedDays(): Set<DayKey> {
+    return new Set(segmentsOf(this.state()).map((s) => s.day));
+  }
+
+  /**
+   * Builds the transaction inserting day segments at their chronological place.
+   * Days already loaded are skipped.
+   */
+  insertDaysSpec(sources: readonly DaySource[]): TransactionSpec | null {
+    const state = this.state();
+    const segments = segmentsOf(state);
+    const loaded = new Set(segments.map((s) => s.day));
+    const changes: { from: number; insert: string }[] = [];
+    for (const source of [...sources].sort((a, b) => (a.day < b.day ? -1 : 1))) {
+      if (loaded.has(source.day)) continue;
+      loaded.add(source.day);
+      const next = segments.find((s) => s.day > source.day);
+      if (next) changes.push({ from: next.sentinelFrom, insert: `${segmentText(source)}\n` });
+      else changes.push({ from: state.doc.length, insert: `\n${segmentText(source)}` });
+    }
+    if (changes.length === 0) return null;
+    return { changes, annotations: [programmatic.of(true), fromDisk.of(true)] };
   }
 
   /** Called for every editor transaction. */

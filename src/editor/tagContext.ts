@@ -14,8 +14,8 @@ export interface TagEditorContext {
   colorOf(raw: string): PaletteColor;
   /** Completion candidates, most recently used first (archived tags excluded). */
   completions(): readonly TagCompletion[];
-  /** Opens the topic view of a tag (primary name). */
-  openTag(name: string): void;
+  /** Opens the topic view of a tag (primary name); `add` combines it with the current topic. */
+  openTag(name: string, add?: boolean): void;
 }
 
 const defaultContext: TagEditorContext = {

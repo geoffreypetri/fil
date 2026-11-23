@@ -28,7 +28,7 @@ export class TagService {
   private invalidSheets: string[] = [];
   private readonly listeners = new Set<() => void>();
   private completionCache: TagCompletion[] | null = null;
-  openTag: (name: string) => void = () => undefined;
+  openTag: (name: string, add?: boolean) => void = () => undefined;
 
   constructor(
     private readonly store: FileStore,
@@ -167,7 +167,7 @@ export class TagService {
       canonical: (raw) => this.resolve(raw),
       colorOf: (raw) => this.colorOf(raw),
       completions: () => this.completions(),
-      openTag: (name) => this.openTag(name),
+      openTag: (name, add) => this.openTag(name, add),
     };
   }
 }
