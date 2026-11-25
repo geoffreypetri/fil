@@ -1,4 +1,5 @@
 import { availableLocales, setLocale, t } from '../../i18n';
+import { HELPERS, helperLabel, type HelperId } from '../../editor/helpers';
 import type { Navigator } from '../../journal/navigator';
 import { normalizeTag } from '../../model/tags';
 import type { RenameService } from '../../tags/renameService';
@@ -21,6 +22,8 @@ export interface CommandDeps {
   openRename(name: string): void;
   focusSheet(): void;
   openWhatsNew(): void;
+  /** Runs a writing helper at the cursor. */
+  runHelper(id: HelperId): void;
   /** Reports the outcome of an action through the status indicator. */
   report(message: string, isError?: boolean): void;
   onLocaleChange(): void;
@@ -202,6 +205,12 @@ export function rootMode(deps: CommandDeps): PaletteMode {
     }
     if (deps.topic.isOpen()) list.push({ id: 'close-topic', label: t('command.closeTopic'), run: () => deps.topic.close() });
     list.push(
+      ...HELPERS.map((id) => ({
+        id: `helper:${id}`,
+        label: t('command.helper', { label: helperLabel(id) }),
+        detail: `/${id}`,
+        run: () => deps.runHelper(id),
+      })),
       { id: 'page', label: t('command.goToPage'), run: () => pageMode(deps) },
       { id: 'theme', label: t('command.toggleTheme'), run: () => toggleTheme() },
       { id: 'system-theme', label: t('command.systemTheme'), run: () => setTheme('system') },

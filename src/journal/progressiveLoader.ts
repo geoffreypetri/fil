@@ -37,6 +37,24 @@ export class ProgressiveLoader {
     return { pos: block.from, offset: Math.max(0, block.top + docTop) };
   }
 
+  /** Moves the scroll position so the anchor line sits exactly `offset` px below the top. */
+  private async settle(pos: number, offset: number): Promise<void> {
+    for (let pass = 0; pass < 3; pass++) {
+      await new Promise<void>((resolve) => {
+        this.view.requestMeasure({
+          read: (view) => {
+            const top = view.lineBlockAt(pos).top + view.documentTop - view.scrollDOM.getBoundingClientRect().top;
+            return top - offset;
+          },
+          write: (delta, view) => {
+            if (Math.abs(delta) >= 1) view.scrollDOM.scrollTop += delta;
+            resolve();
+          },
+        });
+      });
+    }
+  }
+
   async maybeLoad(): Promise<void> {
     if (this.loading || this.view.scrollDOM.scrollTop > LOAD_THRESHOLD_PX) return;
     const names = this.sync.olderNames(BATCH_PAGES);
@@ -52,6 +70,8 @@ export class ProgressiveLoader {
         // Map forward: text inserted exactly at the anchor goes above it.
         const pos = tr.changes.mapPos(anchor.pos, 1);
         this.view.dispatch({ effects: EditorView.scrollIntoView(pos, { y: 'start', yMargin: anchor.offset }) });
+        // Heights of the new pages are estimated until rendered: correct once they are measured.
+        await this.settle(pos, anchor.offset);
       }
     } finally {
       this.loading = false;

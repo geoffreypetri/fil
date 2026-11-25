@@ -5,6 +5,7 @@ import { tagAutocomplete } from './editor/tagAutocomplete';
 import { refreshTags, tagContext } from './editor/tagContext';
 import { tagDecorations } from './editor/tagDecorations';
 import { topicFilter } from './editor/topicFilter';
+import { helperContext, runHelper } from './editor/helpers';
 import type { FileStore } from './fs/store';
 import { IdbIndexCache } from './index/cache';
 import { buildIndex } from './index/indexBuilder';
@@ -117,6 +118,13 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
         focusSheet: () => topic.focusSheet(),
         report: (message, isError) => status.set('palette', isError ? 'error' : 'saved', [message]),
         openWhatsNew: () => openWhatsNew(focusEditor),
+        runHelper: (id) => {
+          const view = context.view;
+          if (!view) return;
+          // From the palette, a new page of the day goes at the end of the document.
+          const at = id === 'today' ? view.state.doc.length : view.state.selection.main.head;
+          void runHelper(view, id, at, at);
+        },
         onLocaleChange: () => {
           void pages.flush().then(() => location.reload());
         },
@@ -178,6 +186,10 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
         tagAutocomplete(),
         checkboxes(),
         topicFilter(),
+        helperContext.of({
+          now: () => new Date(),
+          goToPage: async (name) => pages.hasPage(name) && (await navigator.goToPage(name)),
+        }),
       ],
     });
     pages.attach(() => view);

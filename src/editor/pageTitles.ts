@@ -2,18 +2,18 @@ import { RangeSetBuilder, type Extension } from '@codemirror/state';
 import { Decoration, ViewPlugin, type DecorationSet, type EditorView, type ViewUpdate } from '@codemirror/view';
 import { pagesField } from './pageField';
 
+// The same decoration for every title: a first-page variant would change height as soon as
+// earlier pages are loaded above it, and make the view jump.
 const titleLine = Decoration.line({ class: 'cm-page-title' });
-const firstTitleLine = Decoration.line({ class: 'cm-page-title cm-page-title--first' });
 
 /** Marks the first line of each page so pages read as distinct blocks of the document. */
 function build(view: EditorView): DecorationSet {
   const builder = new RangeSetBuilder<Decoration>();
   const pages = view.state.field(pagesField);
   const { from, to } = view.viewport;
-  pages.forEach((page, index) => {
-    if (page.from < from || page.from > to) return;
-    builder.add(page.from, page.from, index === 0 && page.from === 0 ? firstTitleLine : titleLine);
-  });
+  for (const page of pages) {
+    if (page.from >= from && page.from <= to) builder.add(page.from, page.from, titleLine);
+  }
   return builder.finish();
 }
 

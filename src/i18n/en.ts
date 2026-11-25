@@ -85,6 +85,13 @@ export const en = {
   'command.closeTopic': 'Close topic view',
   'command.install': 'Install Fil as an app',
   'command.whatsNew': 'What’s new',
+  'command.helper': 'Insert: {label}',
+
+  'helper.today': 'Today’s page',
+  'helper.now': 'Current time',
+  'helper.date': 'Today’s date',
+  'helper.note': 'Timed heading',
+  'helper.todo': 'Task',
   'command.version': 'Fil {version}',
   'command.versionDetail': 'Version',
 

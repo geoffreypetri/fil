@@ -1,5 +1,16 @@
 # What's new
 
+## 0.3.0 — 2026-11-25
+
+- **A free page.** Fil no longer adds dates, times or headings: write the way you want. Each `# Title` starts a page of its own, saved as `Title.md` in your notes folder.
+- **Pages follow their heading.** A new title creates its file, a changed title renames it, a deleted title moves the file to `.fil/trash/` and its text joins the page above.
+- **Your order, kept.** The order of the pages is saved in `index.md`, which also reads as a table of contents. Text above the first title goes to `Inbox.md`.
+- **Writing helpers.** Type `/` for `/today` (today's page), `/now`, `/date`, `/note` (a timed heading) and `/todo`. Also in `Ctrl+K`.
+- **Topics follow your structure.** A tag in a heading covers its whole section; otherwise the paragraph where it is written.
+- **Go to page** in `Ctrl+K`, and `Ctrl+A` now selects the paragraph, the section, the page, then everything.
+- **Task lists end** when you press `Enter` on an empty task.
+- Notes stored by earlier versions (`2026/11/…` folders) are left untouched but no longer shown.
+
 ## 0.2.0 — 2026-11-25
 
 - **Updates install themselves.** Fil checks for a new version regularly and switches to it on its own — while the window is in the background, or after 10 minutes without typing. Your edits are saved first and you come back to the same place.

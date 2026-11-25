@@ -21,7 +21,6 @@ const baseTheme = EditorView.theme({
   '.cm-content ::selection, .cm-content::selection': { backgroundColor: 'var(--selection)' },
   // Each page starts with its "# Title": space above it marks the page boundary.
   '.cm-line.cm-page-title': { paddingTop: '44px' },
-  '.cm-line.cm-page-title--first': { paddingTop: '0' },
   '.cm-link-text': { color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: '2px' },
   '.cm-tag': {
     color: 'var(--tag-fg)',

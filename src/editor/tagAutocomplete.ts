@@ -6,6 +6,7 @@ import {
 } from '@codemirror/autocomplete';
 import type { Extension } from '@codemirror/state';
 import { t } from '../i18n';
+import { helperCompletionSource } from './helpers';
 import { inCode, tagContext } from './tagContext';
 
 const TAG_BEFORE_CURSOR = /(?<![\p{L}\p{N}_&/#])#[\p{L}\p{N}_-]*/u;
@@ -44,7 +45,7 @@ export function tagCompletionSource(context: CompletionContext): CompletionResul
 
 export function tagAutocomplete(): Extension {
   return autocompletion({
-    override: [tagCompletionSource],
+    override: [tagCompletionSource, helperCompletionSource],
     icons: false,
     activateOnTyping: true,
     closeOnBlur: true,
