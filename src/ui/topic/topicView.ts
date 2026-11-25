@@ -1,13 +1,13 @@
 import { EditorView } from '@codemirror/view';
-import { fromDisk } from '../../editor/segmentField';
+import { fromDisk } from '../../editor/pageField';
 import { setTopicTags } from '../../editor/topicFilter';
 import { parseSheet } from '../../model/frontmatter';
+import { INBOX_NAME, pageNameOf } from '../../model/pages';
 import { tagSheetPath } from '../../model/paths';
 import type { FileStore } from '../../fs/store';
 import { formatDateTime, t } from '../../i18n';
 import type { ActionRef } from '../../index/tagIndex';
 import { setActionDone } from '../../journal/actionToggle';
-import type { Journal } from '../../journal/journal';
 import type { Navigator } from '../../journal/navigator';
 import type { Saver } from '../../sync/saver';
 import type { StatusHub } from '../../sync/status';
@@ -21,7 +21,6 @@ export interface TopicViewDeps {
   readonly host: HTMLElement;
   readonly store: FileStore;
   readonly saver: Saver;
-  readonly journal: Journal;
   readonly tags: TagService;
   readonly status: StatusHub;
   readonly navigator: Navigator;
@@ -30,8 +29,8 @@ export interface TopicViewDeps {
 }
 
 /**
- * Topic view, in the same screen as the journal: the tag sheet (pinned), the open actions,
- * then the journal itself as history, with notes lacking the tag folded away.
+ * Topic view, in the same screen as the notes: the tag sheet (pinned), the open actions,
+ * then the document itself as history, with notes lacking the tag folded away.
  */
 export class TopicView {
   private tagsValue: readonly string[] | null = null;
@@ -45,7 +44,7 @@ export class TopicView {
     this.actions = new OpenActions({
       tags: deps.tags,
       onToggle: (ref, done) => this.toggle(ref, done),
-      onGoTo: (ref) => void deps.navigator.goToLine(ref.day, ref.action.line),
+      onGoTo: (ref) => void deps.navigator.goToLine(pageNameOf(ref.path) ?? INBOX_NAME, ref.action.line),
     });
     deps.host.hidden = true;
     deps.host.append(
@@ -86,7 +85,7 @@ export class TopicView {
     this.renderHeader();
     this.refreshActions();
 
-    await this.loadDaysWithTopic(names);
+    await this.loadPagesWithTopic(names);
     const view = this.deps.view();
     if (view) {
       view.dispatch({ effects: setTopicTags.of(names) });
@@ -138,13 +137,12 @@ export class TopicView {
     for (const dispose of this.disposers) dispose();
   }
 
-  /** Makes sure every day holding a note of the topic is in the editor. */
-  private async loadDaysWithTopic(names: readonly string[]): Promise<void> {
-    const loaded = this.deps.journal.loadedDays();
-    const missing = [
-      ...new Set(this.deps.tags.index.notesWith(names, this.deps.tags.resolve).map((n) => n.day)),
-    ].filter((day) => !loaded.has(day));
-    await this.deps.navigator.loadDays(missing);
+  /** Makes sure every page holding a note of the topic is in the editor. */
+  private async loadPagesWithTopic(names: readonly string[]): Promise<void> {
+    const pages = this.deps.tags.index
+      .notesWith(names, this.deps.tags.resolve)
+      .flatMap((note) => pageNameOf(note.path) ?? []);
+    await this.deps.navigator.loadPages([...new Set(pages)]);
   }
 
   private renderHeader(): void {

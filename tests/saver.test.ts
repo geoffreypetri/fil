@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { isConflictFile } from '../src/fs/conflicts';
 import { MemoryStore } from '../src/fs/memoryStore';
-import { classifyFiles } from '../src/model/folderScan';
 import { Saver } from '../src/sync/saver';
 import type { SaveState } from '../src/sync/status';
 
@@ -69,24 +68,12 @@ describe('Saver', () => {
 
 describe('conflict detection', () => {
   it('recognizes conflict copies from sync tools', () => {
-    expect(isConflictFile('2026/11/2026-11-23 (conflicted copy 2026-11-24).md')).toBe(true);
-    expect(isConflictFile('2026/11/2026-11-23 (1).md')).toBe(true);
-    expect(isConflictFile('2026/11/2026-11-23-DESKTOP-AB12.md')).toBe(true);
-    expect(isConflictFile('2026/11/2026-11-23.sync-conflict-20261123-145200-ABC.md')).toBe(true);
-    expect(isConflictFile('2026/11/2026-11-23.md')).toBe(false);
+    expect(isConflictFile('Notes (conflicted copy 2026-11-24).md')).toBe(true);
+    expect(isConflictFile('Notes (1).md')).toBe(true);
+    expect(isConflictFile('Notes-DESKTOP-conflict.md')).toBe(true);
+    expect(isConflictFile('Notes.sync-conflict-20261123-145200-ABC.md')).toBe(true);
+    expect(isConflictFile('Notes.md')).toBe(false);
+    expect(isConflictFile('Conflict resolution.md')).toBe(false);
     expect(isConflictFile('tags/project-x.md')).toBe(false);
-  });
-
-  it('classifies folder files', () => {
-    const scan = classifyFiles([
-      { path: '2026/11/2026-11-23.md', lastModified: 2, size: 1 },
-      { path: '2026/11/2026-11-21.md', lastModified: 1, size: 1 },
-      { path: '2026/11/2026-11-23 (1).md', lastModified: 3, size: 1 },
-      { path: 'tags/project-x.md', lastModified: 4, size: 1 },
-      { path: 'readme.txt', lastModified: 5, size: 1 },
-    ]);
-    expect(scan.days.map((d) => d.day)).toEqual(['2026-11-21', '2026-11-23']);
-    expect(scan.sheets.map((s) => s.stem)).toEqual(['project-x']);
-    expect(scan.conflicts.map((c) => c.path)).toEqual(['2026/11/2026-11-23 (1).md']);
   });
 });

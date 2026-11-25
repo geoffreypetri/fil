@@ -1,12 +1,11 @@
 import { StateEffect, StateField, type EditorState, type Extension, Prec } from '@codemirror/state';
 import { Decoration, EditorView, WidgetType, type DecorationSet } from '@codemirror/view';
 import { plural, t } from '../i18n';
-import { parseNotes } from '../model/dayParser';
-import { extractTagsByLine } from '../model/tags';
-import { segmentsOf } from './segmentField';
+import { parseUnits } from '../model/units';
+import { pageRanges } from './pageField';
 import { refreshTags, tagContext } from './tagContext';
 
-/** Sets the tags of the topic view (combined with AND), or null for the full journal. */
+/** Sets the tags of the topic view (combined with AND), or null for the whole document. */
 export const setTopicTags = StateEffect.define<readonly string[] | null>();
 
 /** Reveals hidden notes, identified by the position of their first line. */
@@ -37,56 +36,62 @@ export const topicState = StateField.define<TopicState>({
 export interface Block {
   readonly from: number;
   readonly to: number;
-  /** Position of the note's first line, or null for a day separator block. */
+  /** Position identifying the note (to reveal it), or null for blank space. */
   readonly note: number | null;
+  /** Whether the block is a note (paragraph) rather than a heading or blank space. */
+  readonly isNote: boolean;
   readonly visible: boolean;
 }
 
 /**
- * Splits the document into blocks (day separators and notes) and decides which are visible:
- * a note is visible when it carries every topic tag; a day separator when its day has a
- * visible note. The last day always stays visible so the user can keep writing.
+ * Splits the document into blocks (headings and paragraphs, with the blank lines after them)
+ * and decides which are visible: a note is visible when every topic tag applies to it — written
+ * in it, or in a heading it is under. Headings above a visible note stay visible for context.
+ * The end of the document always stays visible so the user can keep writing.
  */
 export function topicBlocks(state: EditorState, tags: readonly string[], revealed: ReadonlySet<number>): Block[] {
   const { doc } = state;
   const canonical = state.facet(tagContext).canonical;
-  const segments = segmentsOf(state);
+  const { inbox, pages } = pageRanges(state);
+  const parts = [inbox, ...pages].filter(
+    (part, index) => !(index === 0 && part.from === part.to && pages.length > 0 && pages[0]!.from === 0),
+  );
   const blocks: Block[] = [];
 
-  segments.forEach((segment, segmentIndex) => {
-    const content = doc.sliceString(segment.from, segment.to);
-    const lines = content.split('\n');
+  for (const part of parts) {
+    const lines = doc.sliceString(part.from, part.to).split('\n');
     const lineStarts: number[] = [];
-    let offset = segment.from;
+    let offset = part.from;
     for (const line of lines) {
       lineStarts.push(offset);
       offset += line.length + 1;
     }
     const lineEnd = (index: number): number => lineStarts[index]! + lines[index]!.length;
-    const tagsByLine = extractTagsByLine(lines);
-    const notes = parseNotes(lines);
-    const isLast = segmentIndex === segments.length - 1;
-
-    const noteBlocks: Block[] = notes.map((note) => {
-      const names = new Set(tagsByLine.slice(note.startLine, note.endLine + 1).flat().map((m) => canonical(m.tag)));
-      const from = lineStarts[note.startLine]!;
-      return {
-        from,
-        to: lineEnd(note.endLine),
-        note: from,
-        visible: tags.every((tag) => names.has(tag)) || revealed.has(from),
-      };
+    const units = parseUnits(lines);
+    if (units.length === 0) {
+      blocks.push({ from: part.from, to: part.to, note: null, isNote: false, visible: false });
+      continue;
+    }
+    const shown = units.map((unit) => {
+      const names = new Set(unit.tags.map(canonical));
+      return tags.every((tag) => names.has(tag)) || revealed.has(lineStarts[unit.startLine]!);
     });
-    const firstNoteLine = notes[0]?.startLine ?? lines.length;
-    const headerEnd = firstNoteLine > 0 ? lineEnd(firstNoteLine - 1) : doc.lineAt(segment.sentinelFrom).to;
-    blocks.push({
-      from: segment.sentinelFrom,
-      to: headerEnd,
-      note: null,
-      visible: isLast || noteBlocks.some((b) => b.visible),
+    const contextHeadings = new Set(units.flatMap((unit, i) => (shown[i] ? unit.headings : [])));
+    units.forEach((unit, i) => {
+      const next = units[i + 1];
+      const startLine = i === 0 ? 0 : unit.startLine;
+      const endLine = next ? next.startLine - 1 : lines.length - 1;
+      blocks.push({
+        from: lineStarts[startLine]!,
+        to: lineEnd(endLine),
+        note: lineStarts[unit.startLine]!,
+        isNote: unit.kind === 'block',
+        visible: shown[i]! || (unit.kind === 'heading' && contextHeadings.has(unit.startLine)),
+      });
     });
-    blocks.push(...noteBlocks);
-  });
+  }
+  const last = blocks.at(-1);
+  if (last && !last.visible) blocks[blocks.length - 1] = { ...last, visible: true };
   return blocks;
 }
 
@@ -133,8 +138,9 @@ function buildFilter(state: EditorState): DecorationSet {
     while (j + 1 < blocks.length && !blocks[j + 1]!.visible) j += 1;
     const run = blocks.slice(i, j + 1);
     const notes = run.flatMap((b) => (b.note === null ? [] : [b.note]));
+    const count = run.filter((b) => b.isNote).length;
     ranges.push(
-      Decoration.replace({ widget: new HiddenNotesWidget(notes.length, notes), block: true }).range(
+      Decoration.replace({ widget: new HiddenNotesWidget(count, notes), block: true }).range(
         run[0]!.from,
         run[run.length - 1]!.to,
       ),

@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { MemoryStore } from '../src/fs/memoryStore';
 import { TagIndex } from '../src/index/tagIndex';
-import { indexDay } from '../src/model/dayIndex';
+import { indexPage } from '../src/model/pageIndex';
+import { pageNameOf } from '../src/model/pages';
 import { parseSheet } from '../src/model/frontmatter';
 import {
   UndoConflictError,
@@ -14,16 +15,15 @@ import {
 } from '../src/model/rename';
 import { TagTable } from '../src/model/tagTable';
 
-const D1 = '2026/11/2026-11-21.md';
-const D2 = '2026/11/2026-11-22.md';
-const D3 = '2026/11/2026-11-23.md';
+const D1 = 'Kick-off.md';
+const D2 = 'Nothing.md';
+const D3 = 'Follow-up.md';
 
 function setup(files: Record<string, string>) {
   const store = new MemoryStore(files);
   const index = new TagIndex();
   for (const [path, text] of Object.entries(files)) {
-    const day = /(\d{4}-\d{2}-\d{2})\.md$/.exec(path)?.[1];
-    if (day && path.startsWith('20')) index.set(indexDay(day, text, 1));
+    if (pageNameOf(path) !== null) index.set(indexPage(path, text, 1));
   }
   const sheets = Object.entries(files)
     .filter(([path]) => /^tags\/[^/]+\.md$/.test(path))
@@ -65,7 +65,7 @@ describe('rename preview', () => {
       from: 'old',
       to: 'new',
       notes: 2,
-      days: ['2026-11-21', '2026-11-23'],
+      paths: [D3, D1],
       hasSheet: true,
       merge: true,
     });
@@ -97,14 +97,14 @@ describe('rename keeping the old name as alias', () => {
 });
 
 describe('rename everywhere', () => {
-  it('retags day files and renames the sheet', async () => {
+  it('retags pages and renames the sheet', async () => {
     const ctx = setup(FILES);
     const result = await executeRename(ctx.store, preview('old', 'new', ctx), 'everywhere');
     const files = ctx.store.snapshot();
     expect(files[D1]).toBe('## 09:00\n#new kick-off with #older and `#old` in code\n');
     expect(files[D2]).toBe(FILES[D2]);
     expect(files['tags/new.md']).toBe('---\ncolor: red\naliases: [o]\nextra: kept\n---\nOld body.\n');
-    expect(result.changes.map((c) => c.path)).toEqual([D1, D3, 'tags/new.md', 'tags/old.md']);
+    expect(result.changes.map((c) => c.path)).toEqual([D3, D1, 'tags/new.md', 'tags/old.md']);
   });
 
   it('rolls back every file when a write fails midway', async () => {

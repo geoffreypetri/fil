@@ -1,7 +1,6 @@
 import { syntaxTree } from '@codemirror/language';
 import type { Extension, Range } from '@codemirror/state';
 import { Decoration, ViewPlugin, type DecorationSet, type EditorView, type ViewUpdate } from '@codemirror/view';
-import { parseTimeHeader } from '../model/dayParser';
 
 const hidden = Decoration.replace({});
 const linkText = Decoration.mark({ class: 'cm-link-text' });
@@ -37,8 +36,7 @@ function buildPreview(view: EditorView): DecorationSet {
           if (!isActive(node.from)) ranges.push(hidden.range(node.from, node.to));
         } else if (node.name === 'HeaderMark') {
           const line = doc.lineAt(node.from);
-          // "## 14:52" lines are note time stamps, rendered by their own widget.
-          if (isActive(node.from) || parseTimeHeader(line.text) !== null || node.from !== line.from) return;
+          if (isActive(node.from) || node.from !== line.from) return;
           const end = doc.sliceString(node.to, node.to + 1) === ' ' ? node.to + 1 : node.to;
           ranges.push(hidden.range(node.from, end));
         } else if (node.name === 'Link') {

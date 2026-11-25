@@ -1,7 +1,8 @@
-import { RangeSetBuilder, type Extension } from '@codemirror/state';
+import { Prec, RangeSetBuilder, type Extension } from '@codemirror/state';
 import {
   Decoration,
   EditorView,
+  keymap,
   ViewPlugin,
   WidgetType,
   type DecorationSet,
@@ -92,6 +93,21 @@ const checkboxPlugin = ViewPlugin.fromClass(
   },
 );
 
+/**
+ * Enter on an empty task ("- [ ] " and nothing else) ends the list, as it does for an empty
+ * bullet. Without this, the "[ ]" counts as content and the list never ends.
+ */
+export function endEmptyTask(view: EditorView): boolean {
+  const { state } = view;
+  const { main } = state.selection;
+  if (!main.empty || state.selection.ranges.length > 1) return false;
+  const line = state.doc.lineAt(main.head);
+  if (main.head !== line.to || !/^\s*[-*+] \[[ xX]\]\s*$/.test(line.text)) return false;
+  view.dispatch({ changes: { from: line.from, to: line.to }, selection: { anchor: line.from }, userEvent: 'delete' });
+  return true;
+}
+
 export function checkboxes(): Extension {
-  return checkboxPlugin;
+  // Highest: the Markdown keymap (also high) would otherwise continue the list first.
+  return [checkboxPlugin, Prec.highest(keymap.of([{ key: 'Enter', run: endEmptyTask }]))];
 }

@@ -1,6 +1,6 @@
-import { formatDate, t } from '../../i18n';
+import { t } from '../../i18n';
 import type { ActionRef } from '../../index/tagIndex';
-import { dateOfDayKey } from '../../model/paths';
+import { pageNameOf } from '../../model/pages';
 import { extractLineTags } from '../../model/tags';
 import type { TagService } from '../../tags/tagService';
 import { h } from '../dom';
@@ -76,7 +76,7 @@ export class OpenActions {
         checkbox.disabled = false;
       });
     });
-    const when = `${formatDate(dateOfDayKey(ref.day))}${ref.time ? ` ${ref.time}` : ''}`;
+    const when = pageNameOf(ref.path) ?? ref.path;
     return h(
       'li',
       { class: `topic-actions__item${ref.action.done ? ' topic-actions__item--done' : ''}` },

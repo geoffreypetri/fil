@@ -19,35 +19,9 @@ const baseTheme = EditorView.theme({
   '.cm-line': { padding: '0' },
   // Native selection: it highlights the text itself, not full-width blocks.
   '.cm-content ::selection, .cm-content::selection': { backgroundColor: 'var(--selection)' },
-  '.cm-day-separator': {
-    padding: '48px 0 12px',
-  },
-  '.cm-day-separator__label': {
-    paddingBottom: '6px',
-    borderBottom: '1px solid var(--border)',
-    color: 'var(--fg-muted)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: '13px',
-    userSelect: 'none',
-  },
-  // First line of a note: its time sits in the left column, outside the text.
-  '.cm-line.cm-note-start': { position: 'relative', paddingTop: '14px' },
-  '.cm-line.cm-note-start::before': {
-    content: 'attr(data-time)',
-    position: 'absolute',
-    top: '14px',
-    left: '-64px',
-    width: '48px',
-    textAlign: 'right',
-    color: 'var(--fg-faint)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: '12px',
-    fontWeight: '400',
-    fontStyle: 'normal',
-    lineHeight: 'calc(16px * 1.65)',
-    pointerEvents: 'none',
-    userSelect: 'none',
-  },
+  // Each page starts with its "# Title": space above it marks the page boundary.
+  '.cm-line.cm-page-title': { paddingTop: '44px' },
+  '.cm-line.cm-page-title--first': { paddingTop: '0' },
   '.cm-link-text': { color: 'var(--accent)', textDecoration: 'underline', textUnderlineOffset: '2px' },
   '.cm-tag': {
     color: 'var(--tag-fg)',
@@ -98,12 +72,6 @@ const baseTheme = EditorView.theme({
   },
   '.cm-hidden-notes:hover': { color: 'var(--accent)' },
   '.cm-hidden-notes--empty': { height: '0', padding: '0' },
-  '.cm-note-time': {
-    color: 'var(--fg-faint)',
-    fontFamily: 'var(--font-mono)',
-    fontSize: '12px',
-    userSelect: 'none',
-  },
 });
 
 const highlight = (headingSizes: readonly [string, string, string]): HighlightStyle =>
@@ -125,15 +93,14 @@ const journalHighlight = highlight(['1.5em', '1.3em', '1.15em']);
 /** Tag sheets are short reference cards: headings stay close to the text size. */
 const compactHighlight = highlight(['1.15em', '1.05em', '1em']);
 
-/** Layout of the full-screen journal: centered column, generous margins. */
+/** Layout of the full-screen editor: centered column, generous margins. */
 export const journalLayout = EditorView.theme({
   '&': { height: '100%' },
   '.cm-scroller': { overflowAnchor: 'none' },
   '.cm-content': {
-    maxWidth: 'calc(var(--column-width) + 128px)',
+    maxWidth: 'var(--column-width)',
     margin: '0 auto',
-    // The left padding holds the time column; the right one keeps the text centered.
-    padding: '20vh 96px 40vh',
+    padding: '20vh 32px 40vh',
   },
 });
 

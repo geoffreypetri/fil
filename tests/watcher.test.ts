@@ -1,13 +1,12 @@
 import { EditorState, type TransactionSpec } from '@codemirror/state';
 import { describe, expect, it, vi } from 'vitest';
-import { segmentContentOf, segmentExtensions } from '../src/editor/segmentField';
+import { pageContent, pagesField, pageRanges } from '../src/editor/pageField';
 import { MemoryStore } from '../src/fs/memoryStore';
 import { MemoryIndexCache } from '../src/index/cache';
 import { buildIndex } from '../src/index/indexBuilder';
 import { TagIndex } from '../src/index/tagIndex';
-import { Journal } from '../src/journal/journal';
+import { PageSync } from '../src/journal/pageSync';
 import { scanFolder } from '../src/model/folderScan';
-import { buildDocument } from '../src/model/segments';
 import { diffFolder } from '../src/sync/folderDiff';
 import { Saver } from '../src/sync/saver';
 import { StatusHub } from '../src/sync/status';
@@ -32,84 +31,96 @@ describe('folder diff', () => {
   });
 });
 
-async function setup(files: Record<string, string>, loaded: string[]) {
+async function setup(files: Record<string, string>, count?: number) {
   const store = new MemoryStore(files);
   const status = new StatusHub();
-  const saver = new Saver(store, { delayMs: 10_000 });
+  const saver = new Saver(store, { delayMs: 0 });
   const tags = new TagService(store, new TagIndex(), new MemoryIndexCache(), saver);
-  const journal = new Journal(store, saver);
+  const pages = new PageSync(store, saver, { delayMs: 10_000 });
   const scan = await scanFolder(store);
-  journal.setAvailableDays(scan.days.map((d) => d.day));
   await tags.loadSheets(scan);
   await buildIndex(store, scan, tags.index, new MemoryIndexCache());
-  const days = await journal.readDays(loaded);
-  let state = EditorState.create({ doc: buildDocument(days), extensions: segmentExtensions() });
-  journal.attach(() => state);
-  const dispatch = (spec: TransactionSpec | null): void => {
-    if (spec) state = state.update(spec).state;
+  const initial = await pages.load(scan, count);
+  const editor = {
+    state: EditorState.create({ doc: initial.doc, extensions: pagesField.init(() => initial.pages) }),
+    hasFocus: false,
+    dispatch(spec: TransactionSpec) {
+      const tr = this.state.update(spec);
+      this.state = tr.state;
+      pages.handleTransaction(tr);
+    },
   };
+  pages.attach(() => editor as never);
   const onSheetChanged = vi.fn();
   const watcher = new ExternalWatcher({
     store,
     saver,
-    journal,
+    pages,
     tags,
     status,
-    dispatch,
+    dispatch: (spec) => {
+      if (spec) editor.dispatch(spec);
+    },
     onSheetChanged,
-    today: () => '2026-11-23',
   });
-  return { store, saver, tags, journal, status, watcher, onSheetChanged, state: () => state };
+  const contentOf = (name: string): string | null => {
+    const page = editor.state.field(pagesField).find((p) => p.name === name);
+    return page ? pageContent(editor.state, page.id) : null;
+  };
+  return { store, pages, tags, status, watcher, onSheetChanged, editor, contentOf };
 }
 
-const D22 = '2026/11/2026-11-22.md';
-const D23 = '2026/11/2026-11-23.md';
-
 describe('external changes', () => {
-  it('reloads a day changed by another tool, in the editor and the index', async () => {
-    const ctx = await setup({ [D22]: '## 10:00\nold\n', [D23]: '## 11:00\ntoday\n' }, ['2026-11-22', '2026-11-23']);
-    ctx.store.externalWrite(D22, '## 10:00\nfrom another computer #synced\n');
+  it('reloads a page changed by another tool, in the editor and the index', async () => {
+    const ctx = await setup({ 'A.md': '# A\nold\n', 'B.md': '# B\nb\n' });
+    ctx.store.externalWrite('A.md', '# A\nfrom another computer #synced\n');
     await ctx.watcher.check();
-    expect(segmentContentOf(ctx.state(), '2026-11-22')).toBe('## 10:00\nfrom another computer #synced');
-    expect(ctx.tags.index.get('2026-11-22')!.notes[0]!.tags).toEqual(['synced']);
-    // A second check finds nothing new.
+    expect(ctx.contentOf('A')).toBe('# A\nfrom another computer #synced');
+    expect(ctx.contentOf('B')).toBe('# B\nb');
+    expect(ctx.tags.index.get('A.md')!.notes.flatMap((n) => n.ownTags)).toEqual(['synced']);
     const read = vi.spyOn(ctx.store, 'read');
     await ctx.watcher.check();
     expect(read).not.toHaveBeenCalled();
   });
 
-  it('leaves a file with unsaved local edits to the saver', async () => {
-    const ctx = await setup({ [D23]: '## 11:00\ntoday\n' }, ['2026-11-23']);
-    ctx.saver.schedule(D23, () => '## 11:00\nlocal\n');
-    ctx.store.externalWrite(D23, '## 11:00\nremote\n');
+  it('leaves a page with unsaved local edits alone', async () => {
+    const ctx = await setup({ 'A.md': '# A\nlocal\n' });
+    ctx.editor.dispatch({ changes: { from: ctx.editor.state.doc.length, insert: '!' }, userEvent: 'input.type' });
+    ctx.store.externalWrite('A.md', '# A\nremote\n');
     await ctx.watcher.check();
-    expect(segmentContentOf(ctx.state(), '2026-11-23')).toBe('## 11:00\ntoday');
-    await ctx.saver.flush();
+    expect(ctx.contentOf('A')).toBe('# A\nlocal!');
+    await ctx.pages.flush();
     const files = ctx.store.snapshot();
-    expect(files[D23]).toBe('## 11:00\nlocal\n');
-    expect(Object.values(files)).toContain('## 11:00\nremote\n');
+    expect(files['A.md']).toBe('# A\nlocal!\n');
+    expect(Object.values(files)).toContain('# A\nremote\n');
   });
 
-  it('shows a new day of the loaded range and indexes older ones', async () => {
-    const ctx = await setup({ [D22]: '## 10:00\nx\n' }, ['2026-11-22']);
-    ctx.store.externalWrite(D23, '## 08:00\nwritten elsewhere\n');
-    ctx.store.externalWrite('2026/01/2026-01-05.md', '## 08:00\n#old\n');
+  it('shows a page created elsewhere at the end, and drops one deleted elsewhere', async () => {
+    const ctx = await setup({ 'A.md': '# A\na\n', 'B.md': '# B\nb\n' });
+    ctx.store.externalWrite('New.md', '# New\nfrom phone\n');
+    await ctx.store.remove('A.md');
     await ctx.watcher.check();
-    expect(segmentContentOf(ctx.state(), '2026-11-23')).toBe('## 08:00\nwritten elsewhere');
-    expect(segmentContentOf(ctx.state(), '2026-01-05')).toBeNull();
-    expect(ctx.tags.index.get('2026-01-05')).toBeDefined();
-    expect(ctx.journal.olderDays(5)).toEqual(['2026-01-05']);
+    expect(ctx.editor.state.doc.toString()).toBe('# B\nb\n# New\nfrom phone');
+    expect(pageRanges(ctx.editor.state).pages.map((r) => r.page.name)).toEqual(['B', 'New']);
+    expect(ctx.pages.allNames()).toEqual(['B', 'New']);
+  });
+
+  it('adopts an order changed in index.md elsewhere', async () => {
+    const ctx = await setup({ 'A.md': '# A\n', 'B.md': '# B\n', 'index.md': '- [[A]]\n- [[B]]\n' });
+    ctx.store.externalWrite('index.md', '- [[B]]\n- [[A]]\n');
+    await ctx.watcher.check();
+    expect(ctx.pages.allNames()).toEqual(['B', 'A']);
   });
 
   it('reports conflict copies without touching them', async () => {
-    const ctx = await setup({ [D22]: 'x\n', '2026/11/2026-11-22 (1).md': 'copy\n' }, ['2026-11-22']);
+    const ctx = await setup({ 'A.md': 'x\n', 'A (1).md': 'copy\n' });
     await ctx.watcher.check();
-    expect(ctx.status.get().messages).toEqual(['Conflict copy found: 2026/11/2026-11-22 (1).md']);
-    expect(ctx.store.snapshot()['2026/11/2026-11-22 (1).md']).toBe('copy\n');
+    expect(ctx.status.get().messages).toEqual(['Conflict copy found: A (1).md']);
+    expect(ctx.store.snapshot()['A (1).md']).toBe('copy\n');
   });
 
   it('reloads tag sheets and their settings', async () => {
-    const ctx = await setup({ [D22]: '#px\n', 'tags/project-x.md': 'Body\n' }, ['2026-11-22']);
+    const ctx = await setup({ 'A.md': '# A\n#px\n', 'tags/project-x.md': 'Body\n' });
     expect(ctx.tags.resolve('px')).toBe('px');
     ctx.store.externalWrite('tags/project-x.md', '---\naliases: [px]\n---\nBody\n');
     await ctx.watcher.check();

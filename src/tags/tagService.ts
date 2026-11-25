@@ -3,11 +3,12 @@ import type { TagIndex } from '../index/tagIndex';
 import type { TagCompletion, TagEditorContext } from '../editor/tagContext';
 import type { FileStore } from '../fs/store';
 import { t } from '../i18n';
-import { indexDay } from '../model/dayIndex';
+import { indexPage } from '../model/pageIndex';
+import { pageNameOf } from '../model/pages';
 import type { FolderScan } from '../model/folderScan';
 import { parseSheet, writeSettings } from '../model/frontmatter';
 import type { PaletteColor } from '../model/palette';
-import { dayPath, parseDayPath, parseTagSheetPath, tagSheetPath, type DayKey } from '../model/paths';
+import { parseTagSheetPath, tagSheetPath } from '../model/paths';
 import { isValidTag } from '../model/tags';
 import { TagTable, type SheetRecord, type TagSettings } from '../model/tagTable';
 import type { Saver } from '../sync/saver';
@@ -118,18 +119,17 @@ export class TagService {
 
   // ---- Index ----------------------------------------------------------------------------------
 
-  /** Re-indexes a day file after it was written or reloaded. */
-  updateDay(day: DayKey, text: string, lastModified: number): void {
-    const entry = indexDay(day, text, lastModified);
+  /** Re-indexes a page after it was written or reloaded. */
+  updatePage(path: string, text: string, lastModified: number): void {
+    const entry = indexPage(path, text, lastModified);
     this.index.set(entry);
-    void this.cache.save(this.store.name, [[dayPath(day), entry]]);
+    void this.cache.save(this.store.name, [[path, entry]]);
   }
 
   /** Hook for Saver.onWritten. */
   onFileWritten(path: string, text: string, lastModified: number): void {
-    const day = parseDayPath(path);
-    if (day) {
-      this.updateDay(day, text, lastModified);
+    if (pageNameOf(path) !== null) {
+      this.updatePage(path, text, lastModified);
       return;
     }
     const sheet = parseTagSheetPath(path);
@@ -151,8 +151,8 @@ export class TagService {
     this.completionCache = [...names]
       .filter((name) => !table.info(name).settings.archived)
       .sort((a, b) => {
-        const lastA = usage.get(a)?.lastUsed ?? '';
-        const lastB = usage.get(b)?.lastUsed ?? '';
+        const lastA = usage.get(a)?.lastUsed ?? 0;
+        const lastB = usage.get(b)?.lastUsed ?? 0;
         return lastA === lastB ? a.localeCompare(b) : lastA < lastB ? 1 : -1;
       })
       .map((name) => {

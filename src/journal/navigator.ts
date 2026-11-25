@@ -1,68 +1,84 @@
 import { EditorView } from '@codemirror/view';
-import { segmentsOf } from '../editor/segmentField';
+import { pageRanges } from '../editor/pageField';
 import { revealNotes } from '../editor/topicFilter';
-import { parseTimeHeader } from '../model/dayParser';
-import type { DayKey } from '../model/paths';
-import { SENTINEL } from '../model/segments';
-import type { Journal } from './journal';
+import { isInbox } from '../model/pages';
+import { headingLevel } from '../model/units';
+import type { PageSync } from './pageSync';
 
-/** Loads days into the journal editor and moves the cursor to them. */
+const lower = (name: string): string => name.toLocaleLowerCase();
+
+/** Loads pages into the editor and moves the cursor to them. */
 export class Navigator {
   constructor(
-    private readonly journal: Journal,
+    private readonly sync: PageSync,
     private readonly view: () => EditorView | null,
   ) {}
 
-  /** Inserts the given days (read from disk) at their chronological place. */
-  async loadDays(days: readonly DayKey[]): Promise<void> {
-    const loaded = this.journal.loadedDays();
-    const missing = days.filter((day) => !loaded.has(day));
+  /**
+   * Makes sure the given pages are in the editor. The document always holds the last pages, so
+   * the pages between the oldest requested one and the first loaded one are loaded too.
+   */
+  async loadPages(names: readonly string[]): Promise<void> {
+    const order = this.sync.allNames().filter((name) => !isInbox(name)).map(lower);
+    const loaded = new Set(this.sync.loadedNames().map(lower));
+    const missing = names.filter((name) => !isInbox(name) && !loaded.has(lower(name)) && order.includes(lower(name)));
     if (missing.length === 0) return;
-    const sources = await this.journal.readDays(missing);
-    const spec = this.journal.insertDaysSpec(sources);
+    const oldest = missing.sort((a, b) => order.indexOf(lower(a)) - order.indexOf(lower(b)))[0]!;
+    const sources = await this.sync.readPages(this.sync.namesUpTo(oldest));
+    const spec = this.sync.insertBeforeSpec(sources);
     const view = this.view();
     if (spec && view) view.dispatch(spec);
   }
 
-  /** Scrolls to a line of a day file (0-based), unfolding its note if a topic hides it. */
-  async goToLine(day: DayKey, fileLine: number): Promise<void> {
-    await this.loadDays([day]);
+  /** Content range of a page (or of the inbox) in the editor. */
+  private range(name: string): { from: number; to: number } | null {
     const view = this.view();
-    if (!view) return;
-    const segment = segmentsOf(view.state).find((s) => s.day === day);
-    if (!segment) return;
+    if (!view) return null;
+    const { inbox, pages } = pageRanges(view.state);
+    if (isInbox(name)) return inbox;
+    return pages.find((r) => r.page.name !== null && lower(r.page.name) === lower(name)) ?? null;
+  }
+
+  /** Scrolls to a line of a page file (0-based), unfolding its note if a topic hides it. */
+  async goToLine(name: string, fileLine: number): Promise<void> {
+    await this.loadPages([name]);
+    const view = this.view();
+    const range = this.range(name);
+    if (!view || !range) return;
     const { doc } = view.state;
-    const lineNumber = Math.min(doc.lineAt(segment.from).number + fileLine, doc.lineAt(segment.to).number);
+    const lineNumber = Math.min(doc.lineAt(range.from).number + fileLine, doc.lineAt(range.to).number);
     const pos = doc.line(lineNumber).from;
     view.dispatch({
-      effects: [revealNotes.of([pos, ...noteStart(view, pos)]), EditorView.scrollIntoView(pos, { y: 'center' })],
+      effects: [revealNotes.of(noteStarts(view, pos)), EditorView.scrollIntoView(pos, { y: 'center' })],
       selection: { anchor: pos },
     });
     view.focus();
   }
 
-  /** Scrolls to the day separator of a day. */
-  async goToDay(day: DayKey): Promise<void> {
-    await this.loadDays([day]);
+  /** Scrolls to the title of a page and puts the cursor at its end. */
+  async goToPage(name: string): Promise<boolean> {
+    await this.loadPages([name]);
     const view = this.view();
-    if (!view) return;
-    const segment = segmentsOf(view.state).find((s) => s.day === day);
-    if (!segment) return;
+    const range = this.range(name);
+    if (!view || !range) return false;
     view.dispatch({
-      selection: { anchor: segment.from },
-      effects: EditorView.scrollIntoView(segment.sentinelFrom, { y: 'start', yMargin: 48 }),
+      selection: { anchor: range.to },
+      effects: EditorView.scrollIntoView(range.from, { y: 'start', yMargin: 48 }),
     });
     view.focus();
+    return true;
   }
 }
 
-/** Start of the note containing `pos` (so revealing it unfolds the whole note). */
-function noteStart(view: EditorView, pos: number): number[] {
+/** The line itself and the start of its paragraph, so revealing unfolds the whole note. */
+function noteStarts(view: EditorView, pos: number): number[] {
   const { doc } = view.state;
-  for (let line = doc.lineAt(pos); ; line = doc.line(line.number - 1)) {
-    if (parseTimeHeader(line.text) !== null) return [line.from];
-    // Text before the first time stamp of a day is an untimed note starting after the separator.
-    if (line.text.startsWith(SENTINEL)) return [Math.min(line.to + 1, doc.length)];
-    if (line.number === 1) return [];
+  const starts = [pos];
+  for (let line = doc.lineAt(pos); line.number > 1; ) {
+    const previous = doc.line(line.number - 1);
+    if (previous.text.trim() === '' || headingLevel(line.text) > 0) break;
+    line = previous;
+    starts.push(line.from);
   }
+  return starts;
 }

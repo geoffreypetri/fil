@@ -2,17 +2,16 @@ import { defaultKeymap, history, historyKeymap } from '@codemirror/commands';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { EditorState, type Extension, type Transaction } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
-import { buildDocument, type DaySource } from '../model/segments';
-import { dayWidgets } from './dayWidgets';
 import { livePreview } from './livePreview';
-import { newNoteExtensions } from './newNote';
-import { segmentExtensions } from './segmentField';
+import { pagesField, type Page } from './pageField';
+import { pageTitles } from './pageTitles';
 import { progressiveSelectAll } from './selectScope';
 import { editorTheme, journalLayout } from './theme';
 
 export interface JournalEditorOptions {
   parent: HTMLElement;
-  days: readonly DaySource[];
+  doc: string;
+  pages: readonly Page[];
   onTransaction: (tr: Transaction) => void;
   extensions?: Extension;
 }
@@ -29,19 +28,18 @@ export function baseEditing(compact = false): Extension {
   ];
 }
 
-/** The single full-screen editor showing the whole journal. */
+/** The single full-screen editor showing every page, one after the other. */
 export function createJournalEditor(options: JournalEditorOptions): EditorView {
   const state = EditorState.create({
-    doc: buildDocument(options.days),
-    selection: { anchor: buildDocument(options.days).length },
+    doc: options.doc,
+    selection: { anchor: options.doc.length },
     extensions: [
-      segmentExtensions(),
-      dayWidgets(),
-      newNoteExtensions(),
+      pagesField.init(() => options.pages),
+      pageTitles(),
       progressiveSelectAll(),
       baseEditing(),
       journalLayout,
-      EditorView.contentAttributes.of({ spellcheck: 'true', 'aria-label': 'Journal' }),
+      EditorView.contentAttributes.of({ spellcheck: 'true', 'aria-label': 'Notes' }),
       options.extensions ?? [],
     ],
   });
@@ -57,7 +55,7 @@ export function createJournalEditor(options: JournalEditorOptions): EditorView {
   return view;
 }
 
-/** Places the cursor at the end of the journal and scrolls there. */
+/** Places the cursor at the end of the document and scrolls there. */
 export function scrollToEnd(view: EditorView): void {
   const end = view.state.doc.length;
   view.dispatch({ selection: { anchor: end }, effects: EditorView.scrollIntoView(end, { y: 'end' }) });

@@ -1,15 +1,16 @@
 /**
  * Detects conflict copies created by sync services, e.g.
- *   2026-11-23 (conflicted copy 2026-11-24).md      Dropbox, Fil
- *   2026-11-23-DESKTOP-PC.md / 2026-11-23-PC-1.md   OneDrive
- *   2026-11-23 (1).md                               many tools
- *   2026-11-23.sync-conflict-20261123-145200-ABC.md Syncthing
- * These files are never read as day files nor overwritten: they are only reported.
+ *   Notes (conflicted copy 2026-11-24).md      Dropbox, Fil
+ *   Notes (1).md                               many tools
+ *   Notes.sync-conflict-20261123-145200-ABC.md Syncthing
+ *   Notes-DESKTOP-conflict.md                  OneDrive
+ * These files are never read as pages nor overwritten: they are only reported.
  */
 const CONFLICT_PATTERNS: readonly RegExp[] = [
-  /conflict/i,
-  / \(\d+\)\.md$/i,
-  /^\d{4}-\d{2}-\d{2}-.+\.md$/i,
+  /\(conflicted copy\b/i, // Dropbox, Fil
+  /\.sync-conflict-/i, // Syncthing
+  / \(\d+\)\.md$/i, // "(1)" duplicates made by many tools
+  /-conflict(-\d+)?\.md$/i, // OneDrive ("Name-PCNAME-conflict.md" style)
 ];
 
 function fileName(path: string): string {

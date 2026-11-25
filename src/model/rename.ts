@@ -1,7 +1,7 @@
 import type { FileStore } from '../fs/store';
 import type { TagIndex } from '../index/tagIndex';
 import { parseSheet, writeSettings } from './frontmatter';
-import { dayPath, tagSheetPath, type DayKey } from './paths';
+import { tagSheetPath } from './paths';
 import { extractTagsByLine, normalizeTag } from './tags';
 import { EMPTY_SETTINGS, type TagTable } from './tagTable';
 
@@ -10,9 +10,9 @@ export type RenameMode = 'alias' | 'everywhere';
 export interface RenamePreview {
   readonly from: string;
   readonly to: string;
-  /** Notes and day files whose text contains #from. */
+  /** Notes and pages whose text contains #from. */
   readonly notes: number;
-  readonly days: readonly DayKey[];
+  readonly paths: readonly string[];
   readonly hasSheet: boolean;
   /** #to already exists: the rename is a merge. */
   readonly merge: boolean;
@@ -41,7 +41,7 @@ export function previewRename(
     from,
     to,
     notes: usage.notes,
-    days: usage.days,
+    paths: usage.paths,
     hasSheet: table.hasSheet(from),
     merge: targetUsed || table.hasSheet(to),
   };
@@ -137,7 +137,7 @@ export const MERGED_DIR = 'tags/_merged';
 /**
  * Renames (or merges) a tag.
  * - "alias": only sheets change; #from becomes an alias of #to. No note is rewritten.
- * - "everywhere": #from is replaced by #to in every day file, then the sheet is renamed.
+ * - "everywhere": #from is replaced by #to in every page, then the sheet is renamed.
  * The aliases of #from always follow #to. When #to exists, the sheets are merged: the body of
  * the old sheet is appended under "## Merged from #from", the target keeps its color and label,
  * and the old sheet is kept in tags/_merged/. Nothing is deleted. On error, every file already
@@ -152,8 +152,7 @@ export async function executeRename(
   const recorder = new ChangeRecorder(store);
   try {
     if (mode === 'everywhere') {
-      for (const day of preview.days) {
-        const path = dayPath(day);
+      for (const path of preview.paths) {
         const text = await readOrNull(store, path);
         if (text === null) continue;
         const next = retagText(text, from, to);

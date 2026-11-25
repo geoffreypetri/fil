@@ -1,7 +1,5 @@
-import { availableLocales, formatDate, setLocale, t } from '../../i18n';
+import { availableLocales, setLocale, t } from '../../i18n';
 import type { Navigator } from '../../journal/navigator';
-import { nearestDay, parseDateQuery, todayKey } from '../../model/dateQuery';
-import { dateOfDayKey } from '../../model/paths';
 import { normalizeTag } from '../../model/tags';
 import type { RenameService } from '../../tags/renameService';
 import type { TagService } from '../../tags/tagService';
@@ -16,6 +14,8 @@ export interface CommandDeps {
   readonly topic: TopicView;
   readonly navigator: Navigator;
   readonly rename: RenameService;
+  /** Every page name, in document order. */
+  pageNames(): readonly string[];
   chooseFolder(): void;
   openSettings(name: string): void;
   openRename(name: string): void;
@@ -32,7 +32,7 @@ interface TagEntry {
   readonly aliases: readonly string[];
   readonly archived: boolean;
   readonly orphan: boolean;
-  readonly lastUsed: string;
+  readonly lastUsed: number;
 }
 
 function matches(text: string, query: string): number {
@@ -56,7 +56,7 @@ function tagEntries(tags: TagService): TagEntry[] {
         aliases: info.aliases,
         archived: info.settings.archived,
         orphan: !usage.has(name),
-        lastUsed: usage.get(name)?.lastUsed ?? '',
+        lastUsed: usage.get(name)?.lastUsed ?? 0,
       };
     })
     .sort((a, b) => {
@@ -110,30 +110,32 @@ function tagMode(deps: CommandDeps, action: (name: string, alternate: boolean) =
   };
 }
 
-function goToDate(deps: CommandDeps, day: string): void {
+function goToPage(deps: CommandDeps, name: string): void {
   deps.topic.close();
-  const days = deps.tags.index.all().map((entry) => entry.day);
-  const target = day === todayKey() ? day : (nearestDay(day, days) ?? todayKey());
-  void deps.navigator.goToDay(target);
+  void deps.navigator.goToPage(name);
 }
 
-function dateItem(deps: CommandDeps, query: string): PaletteItem | null {
-  const day = parseDateQuery(query, todayKey());
-  if (!day) return null;
-  return {
-    id: `date:${day}`,
-    label: t('command.goToDay', { date: formatDate(dateOfDayKey(day)) }),
-    run: () => goToDate(deps, day),
-  };
+/** Pages whose name matches the query, as "Go to …" items. */
+function pageItems(deps: CommandDeps, query: string, limit = 60): PaletteItem[] {
+  const q = query.toLocaleLowerCase();
+  return deps
+    .pageNames()
+    .map((name, order) => ({ name, order, score: matches(name, q) }))
+    .filter((entry) => entry.score > 0)
+    // Most recent pages (at the end of the document) first.
+    .sort((a, b) => b.score - a.score || b.order - a.order)
+    .slice(0, limit)
+    .map(({ name }) => ({
+      id: `page:${name}`,
+      label: t('command.goToNamedPage', { page: name }),
+      run: () => goToPage(deps, name),
+    }));
 }
 
-function dateMode(deps: CommandDeps): PaletteMode {
+function pageMode(deps: CommandDeps): PaletteMode {
   return {
-    placeholder: t('palette.datePlaceholder'),
-    items: (query) => {
-      const item = dateItem(deps, query || 'today');
-      return item ? [item] : [];
-    },
+    placeholder: t('palette.pagePlaceholder'),
+    items: (query) => pageItems(deps, query),
   };
 }
 
@@ -160,7 +162,7 @@ function languageMode(deps: CommandDeps): PaletteMode {
   };
 }
 
-/** The root mode of the palette: commands, plus matching tags and dates. */
+/** The root mode of the palette: commands, plus matching tags and pages. */
 export function rootMode(deps: CommandDeps): PaletteMode {
   const openTopic = (name: string, add: boolean): void => {
     void (add && deps.topic.isOpen() ? deps.topic.add(name) : deps.topic.open([name]));
@@ -200,8 +202,7 @@ export function rootMode(deps: CommandDeps): PaletteMode {
     }
     if (deps.topic.isOpen()) list.push({ id: 'close-topic', label: t('command.closeTopic'), run: () => deps.topic.close() });
     list.push(
-      { id: 'date', label: t('command.goToDate'), run: () => dateMode(deps) },
-      { id: 'today', label: t('command.goToToday'), run: () => goToDate(deps, todayKey()) },
+      { id: 'page', label: t('command.goToPage'), run: () => pageMode(deps) },
       { id: 'theme', label: t('command.toggleTheme'), run: () => toggleTheme() },
       { id: 'system-theme', label: t('command.systemTheme'), run: () => setTheme('system') },
       { id: 'language', label: t('command.language'), run: () => languageMode(deps) },
@@ -226,11 +227,11 @@ export function rootMode(deps: CommandDeps): PaletteMode {
     items: (query) => {
       const q = query.toLocaleLowerCase();
       if (q.startsWith('#')) return tagItems(deps, q, openTopic);
-      const date = dateItem(deps, query);
+      const pages = q ? pageItems(deps, query, 5) : [];
       const commandItems = commands().filter((item) => matches(item.label, q) > 0);
       // "Ctrl+K then the tag": a query that could be a tag also lists matching tags first.
       const tags = q && normalizeTag(q) !== null ? tagItems(deps, q, openTopic).slice(0, 8) : [];
-      return [...(date ? [date] : []), ...tags, ...commandItems];
+      return [...tags, ...pages, ...commandItems];
     },
   };
 }

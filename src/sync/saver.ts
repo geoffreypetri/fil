@@ -12,7 +12,7 @@ export interface SaverOptions {
   onConflictCopy?: (path: string, copyPath: string) => void;
 }
 
-/** Returns the text to write, or null to skip (e.g. an empty day that has no file yet). */
+/** Returns the text to write, or null to skip (e.g. an empty page that has no file yet). */
 export type TextSource = () => string | null;
 
 interface Pending {

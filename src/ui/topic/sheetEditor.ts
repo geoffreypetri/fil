@@ -1,7 +1,7 @@
 import { EditorState } from '@codemirror/state';
 import { EditorView, placeholder } from '@codemirror/view';
 import { checkboxes } from '../../editor/checkboxes';
-import { fromDisk } from '../../editor/segmentField';
+import { fromDisk } from '../../editor/pageField';
 import { baseEditing } from '../../editor/journalEditor';
 import { tagAutocomplete } from '../../editor/tagAutocomplete';
 import { tagContext } from '../../editor/tagContext';

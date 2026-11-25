@@ -1,12 +1,12 @@
 import { EditorView } from '@codemirror/view';
-import type { Journal } from './journal';
+import type { PageSync } from './pageSync';
 
-export const BATCH_DAYS = 30;
-/** Distance from the top (px) at which older days start loading. */
+export const BATCH_PAGES = 30;
+/** Distance from the top (px) at which earlier pages start loading. */
 export const LOAD_THRESHOLD_PX = 1200;
 
 /**
- * Loads older days when the user scrolls near the top of the journal. The scroll position is
+ * Loads earlier pages when the user scrolls near the top of the document. The scroll position is
  * kept on the same text, so the view never jumps.
  */
 export class ProgressiveLoader {
@@ -14,7 +14,7 @@ export class ProgressiveLoader {
   private readonly onScroll = (): void => void this.maybeLoad();
 
   constructor(
-    private readonly journal: Journal,
+    private readonly sync: PageSync,
     private readonly view: EditorView,
   ) {}
 
@@ -39,12 +39,12 @@ export class ProgressiveLoader {
 
   async maybeLoad(): Promise<void> {
     if (this.loading || this.view.scrollDOM.scrollTop > LOAD_THRESHOLD_PX) return;
-    const days = this.journal.olderDays(BATCH_DAYS);
-    if (days.length === 0) return;
+    const names = this.sync.olderNames(BATCH_PAGES);
+    if (names.length === 0) return;
     this.loading = true;
     try {
-      const sources = await this.journal.readDays(days);
-      const spec = this.journal.insertDaysSpec(sources);
+      const sources = await this.sync.readPages(names);
+      const spec = this.sync.insertBeforeSpec(sources);
       if (spec) {
         const anchor = this.visibleAnchor();
         const tr = this.view.state.update(spec);
@@ -56,7 +56,7 @@ export class ProgressiveLoader {
     } finally {
       this.loading = false;
     }
-    // Keep loading while the top is still close (short days, tall screen).
+    // Keep loading while the top is still close (short pages, tall screen).
     requestAnimationFrame(() => void this.maybeLoad());
   }
 }

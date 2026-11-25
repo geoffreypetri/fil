@@ -1,8 +1,8 @@
 import { EditorState } from '@codemirror/state';
 import { describe, expect, it } from 'vitest';
-import { segmentExtensions } from '../src/editor/segmentField';
-import { fromDayOffset, toDayOffset } from '../src/journal/sessionRestore';
-import { buildDocument } from '../src/model/segments';
+import { pagesField } from '../src/editor/pageField';
+import { buildDocument } from '../src/journal/pageSync';
+import { fromPageOffset, toPageOffset } from '../src/journal/sessionRestore';
 import { IDLE_RELOAD_MS, mayReload } from '../src/sw/updater';
 
 describe('automatic update policy', () => {
@@ -28,20 +28,24 @@ describe('automatic update policy', () => {
 });
 
 describe('position kept across a reload', () => {
-  const days = [
-    { day: '2026-11-24', content: '## 10:00\nyesterday' },
-    { day: '2026-11-25', content: '## 09:00\ntoday text' },
+  const stateOf = (inbox: string, pages: { name: string; content: string }[]): EditorState => {
+    const built = buildDocument(inbox, pages);
+    return EditorState.create({ doc: built.doc, extensions: pagesField.init(() => built.pages) });
+  };
+  const pages = [
+    { name: 'Yesterday', content: '# Yesterday\nold' },
+    { name: 'Today', content: '# Today\ntoday text' },
   ];
-  const stateOf = (list: typeof days): EditorState =>
-    EditorState.create({ doc: buildDocument(list), extensions: segmentExtensions() });
 
-  it('maps a position to its day and back, even when older days are added', () => {
-    const before = stateOf(days);
+  it('maps a position to its page and back, even when earlier pages are added', () => {
+    const before = stateOf('', pages);
     const pos = before.doc.toString().indexOf('text');
-    const saved = toDayOffset(before, pos);
-    expect(saved).toEqual({ day: '2026-11-25', offset: 'today '.length + '## 09:00\n'.length });
-    const after = stateOf([{ day: '2026-11-01', content: 'older' }, ...days]);
-    expect(after.sliceDoc(fromDayOffset(after, saved)!, fromDayOffset(after, saved)! + 4)).toBe('text');
-    expect(fromDayOffset(after, { day: '2026-01-01', offset: 3 })).toBeNull();
+    const saved = toPageOffset(before, pos);
+    expect(saved).toEqual({ page: 'Today', offset: '# Today\ntoday '.length });
+    const after = stateOf('inbox', [{ name: 'Earlier', content: '# Earlier' }, ...pages]);
+    const restored = fromPageOffset(after, saved)!;
+    expect(after.sliceDoc(restored, restored + 4)).toBe('text');
+    expect(fromPageOffset(after, { page: 'Gone', offset: 3 })).toBeNull();
+    expect(toPageOffset(after, 2)).toEqual({ page: 'Inbox', offset: 2 });
   });
 });

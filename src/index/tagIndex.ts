@@ -1,59 +1,55 @@
-import type { ActionEntry, DayEntry, NoteEntry } from '../model/dayIndex';
-import type { DayKey } from '../model/paths';
+import type { ActionEntry, NoteEntry, PageEntry } from '../model/pageIndex';
 
 /** Maps a raw tag to its primary name (alias resolution). */
 export type Resolve = (raw: string) => string;
 
 export interface NoteRef {
-  readonly day: DayKey;
+  readonly path: string;
   readonly note: NoteEntry;
-  readonly index: number;
 }
 
 export interface ActionRef {
-  readonly day: DayKey;
+  readonly path: string;
   readonly action: ActionEntry;
-  /** Time of the note containing the action. */
-  readonly time: string | null;
 }
 
 export interface TagUsage {
-  /** Number of notes using the tag. */
+  /** Number of notes where the tag is written. */
   readonly notes: number;
-  /** Most recent use, as "YYYY-MM-DD HH:MM" for sorting. */
-  readonly lastUsed: string;
+  /** Most recent modification of a page using the tag. */
+  readonly lastUsed: number;
 }
 
 /**
- * In-memory index of tags and actions for every day file. Stores raw tags; aliases are resolved
- * at query time, so changing an alias never requires re-indexing.
+ * In-memory index of tags and actions for every page. Stores raw tags; aliases are resolved at
+ * query time, so changing an alias never requires re-indexing.
  */
 export class TagIndex {
-  private readonly days = new Map<DayKey, DayEntry>();
+  private readonly pages = new Map<string, PageEntry>();
   private readonly listeners = new Set<() => void>();
-  private sorted: DayEntry[] | null = null;
+  private sorted: PageEntry[] | null = null;
 
-  set(entry: DayEntry): void {
-    this.days.set(entry.day, entry);
+  set(entry: PageEntry): void {
+    this.pages.set(entry.path, entry);
     this.changed();
   }
 
-  setMany(entries: Iterable<DayEntry>): void {
-    for (const entry of entries) this.days.set(entry.day, entry);
+  setMany(entries: Iterable<PageEntry>): void {
+    for (const entry of entries) this.pages.set(entry.path, entry);
     this.changed();
   }
 
-  delete(day: DayKey): void {
-    if (this.days.delete(day)) this.changed();
+  delete(path: string): void {
+    if (this.pages.delete(path)) this.changed();
   }
 
-  get(day: DayKey): DayEntry | undefined {
-    return this.days.get(day);
+  get(path: string): PageEntry | undefined {
+    return this.pages.get(path);
   }
 
-  /** Every indexed day, oldest first. */
-  all(): readonly DayEntry[] {
-    this.sorted ??= [...this.days.values()].sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
+  /** Every indexed page, by path. */
+  all(): readonly PageEntry[] {
+    this.sorted ??= [...this.pages.values()].sort((a, b) => a.path.localeCompare(b.path));
     return this.sorted;
   }
 
@@ -67,23 +63,22 @@ export class TagIndex {
     for (const listener of this.listeners) listener();
   }
 
-  /** Every raw tag written in notes. */
+  /** Every raw tag written in pages. */
   rawTags(): Set<string> {
     const tags = new Set<string>();
-    for (const entry of this.days.values()) for (const note of entry.notes) for (const tag of note.tags) tags.add(tag);
+    for (const entry of this.pages.values()) for (const note of entry.notes) for (const tag of note.ownTags) tags.add(tag);
     return tags;
   }
 
   /** Usage per primary name, for sorting completions by recent use. */
   usage(resolve: Resolve): Map<string, TagUsage> {
-    const usage = new Map<string, { notes: number; lastUsed: string }>();
-    for (const entry of this.all()) {
+    const usage = new Map<string, { notes: number; lastUsed: number }>();
+    for (const entry of this.pages.values()) {
       for (const note of entry.notes) {
-        const stamp = `${entry.day} ${note.time ?? '00:00'}`;
-        for (const name of new Set(note.tags.map(resolve))) {
-          const current = usage.get(name) ?? { notes: 0, lastUsed: '' };
+        for (const name of new Set(note.ownTags.map(resolve))) {
+          const current = usage.get(name) ?? { notes: 0, lastUsed: 0 };
           current.notes += 1;
-          if (stamp > current.lastUsed) current.lastUsed = stamp;
+          current.lastUsed = Math.max(current.lastUsed, entry.lastModified);
           usage.set(name, current);
         }
       }
@@ -91,47 +86,41 @@ export class TagIndex {
     return usage;
   }
 
-  /** Notes containing every given tag (primary names). */
+  /** Notes to which every given tag (primary names) applies. */
   notesWith(tags: readonly string[], resolve: Resolve): NoteRef[] {
     const result: NoteRef[] = [];
     for (const entry of this.all()) {
-      entry.notes.forEach((note, index) => {
+      for (const note of entry.notes) {
         const names = new Set(note.tags.map(resolve));
-        if (tags.every((tag) => names.has(tag))) result.push({ day: entry.day, note, index });
-      });
+        if (tags.every((tag) => names.has(tag))) result.push({ path: entry.path, note });
+      }
     }
     return result;
   }
 
-  /**
-   * Actions that belong to every given tag. An action belongs to a tag when its line contains
-   * the tag, or when the note containing it does.
-   */
+  /** Actions that belong to every given tag (through their line, paragraph or headings). */
   actionsFor(tags: readonly string[], resolve: Resolve): ActionRef[] {
     const result: ActionRef[] = [];
     for (const entry of this.all()) {
       for (const action of entry.actions) {
-        const note = entry.notes[action.note];
-        const names = new Set([...action.lineTags, ...(note?.tags ?? [])].map(resolve));
-        if (tags.every((tag) => names.has(tag))) {
-          result.push({ day: entry.day, action, time: note?.time ?? null });
-        }
+        const names = new Set(action.tags.map(resolve));
+        if (tags.every((tag) => names.has(tag))) result.push({ path: entry.path, action });
       }
     }
     return result;
   }
 
-  /** Notes and days whose text contains the raw tag (used by the rename preview). */
-  rawTagUsage(raw: string): { notes: number; days: DayKey[] } {
+  /** Notes and pages whose text contains the raw tag (used by the rename preview). */
+  rawTagUsage(raw: string): { notes: number; paths: string[] } {
     let notes = 0;
-    const days: DayKey[] = [];
+    const paths: string[] = [];
     for (const entry of this.all()) {
-      const count = entry.notes.filter((note) => note.tags.includes(raw)).length;
+      const count = entry.notes.filter((note) => note.ownTags.includes(raw)).length;
       if (count > 0) {
         notes += count;
-        days.push(entry.day);
+        paths.push(entry.path);
       }
     }
-    return { notes, days };
+    return { notes, paths };
   }
 }

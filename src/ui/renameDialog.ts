@@ -49,7 +49,7 @@ export function openRenameDialog(
       t('rename.preview', {
         tag: from,
         notes: plural('count.notes', result.notes),
-        days: plural('count.days', result.days.length),
+        pages: plural('count.pages', result.paths.length),
       }),
       result.hasSheet ? t('rename.previewSheet') : t('rename.previewNoSheet'),
       result.merge ? t('rename.merge', { from, to: result.to }) : '',
@@ -62,7 +62,7 @@ export function openRenameDialog(
     everywhereHint.textContent = t('rename.modeEverywhereHint', {
       from,
       to: result.to,
-      days: plural('count.days', result.days.length),
+      pages: plural('count.pages', result.paths.length),
     });
   };
 

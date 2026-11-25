@@ -4,22 +4,22 @@ import { buildIndex } from '../src/index/indexBuilder';
 import { TagIndex } from '../src/index/tagIndex';
 import { MemoryStore } from '../src/fs/memoryStore';
 import { parseTaskLine, setTaskInText, setTaskLineDone } from '../src/model/actions';
-import { indexDay } from '../src/model/dayIndex';
+import { indexPage } from '../src/model/pageIndex';
 import { scanFolder } from '../src/model/folderScan';
 import { TagTable } from '../src/model/tagTable';
 
-const DAY_22 = `## 09:30
-Team sync on #project-x planning.
+const PAGE_A = `# Sync #project-x
+Team sync, planning.
 - [ ] send minutes
 - [x] book room
 
-## 16:10
+## Ideas
 Idea for #fil.
 - [ ] ping Paul about mockups #project-x
 - [ ] unrelated task
 `;
 
-const DAY_23 = `## 10:00
+const PAGE_B = `# Follow-up
 #px follow-up
 - [ ] review specs
 \`\`\`
@@ -37,20 +37,20 @@ describe('actions', () => {
   });
 
   it('checks the right line in a file', () => {
-    expect(setTaskInText(DAY_22, 7, 'ping Paul about mockups #project-x', true)).toBe(
-      DAY_22.replace('- [ ] ping Paul', '- [x] ping Paul'),
+    expect(setTaskInText(PAGE_A, 7, 'ping Paul about mockups #project-x', true)).toBe(
+      PAGE_A.replace('- [ ] ping Paul', '- [x] ping Paul'),
     );
   });
 
   it('finds the line again when the file shifted', () => {
-    const shifted = `extra line\n${DAY_22}`;
+    const shifted = `extra line\n${PAGE_A}`;
     expect(setTaskInText(shifted, 7, 'ping Paul about mockups #project-x', true)).toBe(
       shifted.replace('- [ ] ping Paul', '- [x] ping Paul'),
     );
   });
 
   it('refuses to write when the line is gone or ambiguous', () => {
-    expect(setTaskInText(DAY_22, 7, 'something else', true)).toBeNull();
+    expect(setTaskInText(PAGE_A, 7, 'something else', true)).toBeNull();
     expect(setTaskInText('- [ ] a\n- [ ] a\n', 5, 'a', true)).toBeNull();
   });
 
@@ -59,31 +59,9 @@ describe('actions', () => {
   });
 });
 
-describe('day index', () => {
-  it('indexes notes, tags and actions', () => {
-    const entry = indexDay('2026-11-22', DAY_22, 1);
-    expect(entry.notes.map((n) => [n.time, n.tags])).toEqual([
-      ['09:30', ['project-x']],
-      ['16:10', ['fil', 'project-x']],
-    ]);
-    expect(entry.actions.map((a) => [a.line, a.done, a.text, a.note])).toEqual([
-      [2, false, 'send minutes', 0],
-      [3, true, 'book room', 0],
-      [7, false, 'ping Paul about mockups #project-x', 1],
-      [8, false, 'unrelated task', 1],
-    ]);
-  });
-
-  it('ignores tasks and tags in code blocks', () => {
-    const entry = indexDay('2026-11-23', DAY_23, 1);
-    expect(entry.actions.map((a) => a.text)).toEqual(['review specs']);
-    expect(entry.notes[0]!.tags).toEqual(['px']);
-  });
-});
-
 describe('tag index', () => {
   const index = new TagIndex();
-  index.setMany([indexDay('2026-11-22', DAY_22, 1), indexDay('2026-11-23', DAY_23, 2)]);
+  index.setMany([indexPage('Sync.md', PAGE_A, 1), indexPage('Follow-up.md', PAGE_B, 2)]);
   const plain = (raw: string): string => raw;
   const table = new TagTable([
     {
@@ -95,9 +73,13 @@ describe('tag index', () => {
   ]);
   const resolve = (raw: string): string => table.canonical(raw);
 
-  it('attaches actions to tags through their line or their note', () => {
-    const actions = index.actionsFor(['project-x'], plain).map((a) => a.action.text);
-    expect(actions).toEqual(['send minutes', 'book room', 'ping Paul about mockups #project-x', 'unrelated task']);
+  it('attaches actions to tags through their line, paragraph or heading', () => {
+    expect(index.actionsFor(['project-x'], plain).map((a) => a.action.text)).toEqual([
+      'send minutes',
+      'book room',
+      'ping Paul about mockups #project-x',
+      'unrelated task',
+    ]);
     expect(index.actionsFor(['fil'], plain).map((a) => a.action.text)).toEqual([
       'ping Paul about mockups #project-x',
       'unrelated task',
@@ -106,44 +88,41 @@ describe('tag index', () => {
 
   it('resolves aliases at query time', () => {
     expect(index.actionsFor(['project-x'], resolve).map((a) => a.action.text)).toContain('review specs');
-    expect(index.notesWith(['project-x'], resolve).map((n) => `${n.day} ${n.note.time}`)).toEqual([
-      '2026-11-22 09:30',
-      '2026-11-22 16:10',
-      '2026-11-23 10:00',
+    expect(index.notesWith(['project-x'], resolve).map((n) => `${n.path}:${n.note.startLine}`)).toEqual([
+      'Follow-up.md:1',
+      'Sync.md:0',
+      'Sync.md:1',
+      'Sync.md:5',
+      'Sync.md:6',
     ]);
   });
 
   it('combines several tags with AND', () => {
-    expect(index.notesWith(['project-x', 'fil'], resolve).map((n) => n.note.time)).toEqual(['16:10']);
-    expect(index.actionsFor(['project-x', 'fil'], resolve).map((a) => a.time)).toEqual(['16:10', '16:10']);
+    expect(index.actionsFor(['project-x', 'fil'], resolve).map((a) => a.action.line)).toEqual([7, 8]);
   });
 
   it('computes usage for completion ordering', () => {
     const usage = index.usage(resolve);
-    expect(usage.get('project-x')).toEqual({ notes: 3, lastUsed: '2026-11-23 10:00' });
-    expect(usage.get('fil')).toEqual({ notes: 1, lastUsed: '2026-11-22 16:10' });
+    expect(usage.get('project-x')).toEqual({ notes: 3, lastUsed: 2 });
+    expect(usage.get('fil')).toEqual({ notes: 1, lastUsed: 1 });
     expect(usage.has('px')).toBe(false);
   });
 
   it('counts raw tag usage', () => {
-    expect(index.rawTagUsage('project-x')).toEqual({ notes: 2, days: ['2026-11-22'] });
+    expect(index.rawTagUsage('project-x')).toEqual({ notes: 2, paths: ['Sync.md'] });
   });
 });
 
 describe('index builder', () => {
   it('reads files once and then uses the cache', async () => {
-    const store = new MemoryStore({
-      '2026/11/2026-11-22.md': DAY_22,
-      '2026/11/2026-11-23.md': DAY_23,
-    });
+    const store = new MemoryStore({ 'Sync.md': PAGE_A, 'Follow-up.md': PAGE_B });
     const cache = new MemoryIndexCache();
     const first = new TagIndex();
     expect(await buildIndex(store, await scanFolder(store), first, cache)).toEqual({ read: 2, cached: 0 });
 
-    store.externalWrite('2026/11/2026-11-23.md', '## 11:00\n#new\n');
+    store.externalWrite('Follow-up.md', '# Follow-up\n#new\n');
     const second = new TagIndex();
     expect(await buildIndex(store, await scanFolder(store), second, cache)).toEqual({ read: 1, cached: 1 });
-    expect(second.get('2026-11-23')!.notes[0]!.tags).toEqual(['new']);
-    expect(second.all().map((d) => d.day)).toEqual(['2026-11-22', '2026-11-23']);
+    expect(second.get('Follow-up.md')!.notes.flatMap((n) => n.ownTags)).toEqual(['new']);
   });
 });

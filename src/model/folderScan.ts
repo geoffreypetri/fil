@@ -1,10 +1,13 @@
 import { isConflictFile } from '../fs/conflicts';
 import type { FileInfo, FileStore } from '../fs/store';
-import { parseDayPath, parseTagSheetPath, type DayKey } from './paths';
+import { INDEX_FILE, pageNameOf } from './pages';
+import { parseTagSheetPath } from './paths';
 
 export interface FolderScan {
-  /** Day files in chronological order. */
-  readonly days: readonly (FileInfo & { day: DayKey })[];
+  /** Markdown files at the root of the folder (pages), by path. */
+  readonly pages: readonly (FileInfo & { name: string })[];
+  /** index.md, which keeps the order of the pages, if present. */
+  readonly index: FileInfo | null;
   /** Files in tags/ (validated later by the tag table). */
   readonly sheets: readonly (FileInfo & { stem: string })[];
   /** Conflict copies left by sync services: reported, never read or overwritten. */
@@ -12,24 +15,29 @@ export interface FolderScan {
 }
 
 export function classifyFiles(files: readonly FileInfo[]): FolderScan {
-  const days: (FileInfo & { day: DayKey })[] = [];
+  const pages: (FileInfo & { name: string })[] = [];
   const sheets: (FileInfo & { stem: string })[] = [];
   const conflicts: FileInfo[] = [];
+  let index: FileInfo | null = null;
   for (const file of files) {
     if (isConflictFile(file.path)) {
       conflicts.push(file);
       continue;
     }
-    const day = parseDayPath(file.path);
-    if (day) {
-      days.push({ ...file, day });
+    if (file.path.toLowerCase() === INDEX_FILE) {
+      index = file;
+      continue;
+    }
+    const name = pageNameOf(file.path);
+    if (name !== null) {
+      pages.push({ ...file, name });
       continue;
     }
     const stem = parseTagSheetPath(file.path);
     if (stem !== null) sheets.push({ ...file, stem });
   }
-  days.sort((a, b) => (a.day < b.day ? -1 : a.day > b.day ? 1 : 0));
-  return { days, sheets, conflicts };
+  pages.sort((a, b) => a.path.localeCompare(b.path));
+  return { pages, index, sheets, conflicts };
 }
 
 export async function scanFolder(store: FileStore): Promise<FolderScan> {

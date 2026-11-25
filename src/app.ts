@@ -9,12 +9,11 @@ import type { FileStore } from './fs/store';
 import { IdbIndexCache } from './index/cache';
 import { buildIndex } from './index/indexBuilder';
 import { TagIndex } from './index/tagIndex';
-import { Journal } from './journal/journal';
 import { Navigator } from './journal/navigator';
+import { PageSync } from './journal/pageSync';
 import { ProgressiveLoader } from './journal/progressiveLoader';
 import { scanFolder } from './model/folderScan';
 import { paletteCss } from './model/palette';
-import { dayKeyOf } from './model/paths';
 import { Saver } from './sync/saver';
 import { StatusHub } from './sync/status';
 import { ExternalWatcher } from './sync/watcher';
@@ -42,7 +41,7 @@ export interface AppContext {
   readonly store: FileStore;
   readonly status: StatusHub;
   readonly saver: Saver;
-  readonly journal: Journal;
+  readonly pages: PageSync;
   readonly tags: TagService;
   readonly topic: TopicView;
   readonly rename: RenameService;
@@ -62,8 +61,11 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
   const tags: TagService = new TagService(store, new TagIndex(), cache, saver, (messages) =>
     status.set('tags', 'saved', messages),
   );
-  const journal = new Journal(store, saver);
-  const navigator = new Navigator(journal, () => context.view);
+  const pages = new PageSync(store, saver, {
+    onPending: (pending) => status.set('pages', pending ? 'saving' : 'saved'),
+    onRemoved: (path) => tags.index.delete(path),
+  });
+  const navigator = new Navigator(pages, () => context.view);
 
   const editorHost = h('div', { class: 'app__editor' });
   const topicHost = h('div', { class: 'topic' });
@@ -78,7 +80,6 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     host: topicHost,
     store,
     saver,
-    journal,
     tags,
     status,
     navigator,
@@ -92,7 +93,7 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     store,
     saver,
     tags,
-    journal,
+    pages,
     view: () => context.view,
     onRenamed: (from, to) => {
       const current = topic.tags;
@@ -109,6 +110,7 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
         topic,
         navigator,
         rename,
+        pageNames: () => pages.allNames(),
         chooseFolder: () => options.onChangeFolder(),
         openSettings,
         openRename: (name) => openRenameDialog(rename, name, () => undefined, focusEditor),
@@ -116,7 +118,7 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
         report: (message, isError) => status.set('palette', isError ? 'error' : 'saved', [message]),
         openWhatsNew: () => openWhatsNew(focusEditor),
         onLocaleChange: () => {
-          void saver.flush().then(() => location.reload());
+          void pages.flush().then(() => location.reload());
         },
       }),
     focusEditor,
@@ -125,7 +127,7 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     store,
     status,
     saver,
-    journal,
+    pages,
     tags,
     topic,
     rename,
@@ -150,7 +152,7 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
   window.addEventListener('keydown', onKeyDown, true);
   disposers.push(() => window.removeEventListener('keydown', onKeyDown, true));
 
-  const flush = (): void => void saver.flush();
+  const flush = (): void => void pages.flush();
   const onVisibility = (): void => {
     if (document.visibilityState === 'hidden') flush();
   };
@@ -164,11 +166,12 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
   void (async () => {
     const scan = await scanFolder(store);
     await tags.loadSheets(scan);
-    const days = await journal.initialDays(scan, dayKeyOf(new Date()));
+    const initial = await pages.load(scan);
     const view = createJournalEditor({
       parent: editorHost,
-      days,
-      onTransaction: (tr) => journal.handleTransaction(tr),
+      doc: initial.doc,
+      pages: initial.pages,
+      onTransaction: (tr) => pages.handleTransaction(tr),
       extensions: [
         tagContext.of(tags.editorContext()),
         tagDecorations(),
@@ -177,12 +180,12 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
         topicFilter(),
       ],
     });
-    journal.attach(() => view.state);
+    pages.attach(() => view);
     context.view = view;
     disposers.push(() => view.destroy());
     disposers.push(tags.onTableChange(() => view.dispatch({ effects: refreshTags.of(null) })));
 
-    const loader = new ProgressiveLoader(journal, view);
+    const loader = new ProgressiveLoader(pages, view);
     loader.start();
     disposers.push(() => loader.stop());
 
@@ -191,14 +194,13 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     const watcher = new ExternalWatcher({
       store,
       saver,
-      journal,
+      pages,
       tags,
       status,
       dispatch: (spec) => {
         if (spec) view.dispatch(spec);
       },
       onSheetChanged: (name) => topic.reloadSheet(name),
-      today: () => dayKeyOf(new Date()),
     });
     watcher.start();
     disposers.push(() => watcher.stop());
@@ -207,6 +209,8 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     // Back from an automatic update: same topic, cursor and scroll position as before.
     const snapshot = takeSession();
     if (snapshot) {
+      const names = [snapshot.anchor?.page, snapshot.scroll?.page].filter((n): n is string => !!n);
+      await navigator.loadPages(names);
       if (snapshot.topic) await topic.open(snapshot.topic);
       applySession(view, snapshot);
     }
@@ -217,8 +221,8 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
 
   // Before an automatic update reloads the page: save everything and remember the position.
   setBeforeReload(async () => {
-    await saver.flush();
-    if (saver.hasPending()) throw new Error('Some files could not be saved');
+    await pages.flush();
+    if (pages.hasPending()) throw new Error('Some files could not be saved');
     if (context.view) saveSession(captureSession(context.view, topic.tags));
   });
   disposers.push(() => setBeforeReload(async () => undefined));
