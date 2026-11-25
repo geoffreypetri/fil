@@ -1,0 +1,57 @@
+.dialog.whats-new {
+  width: min(600px, calc(100vw - 32px));
+}
+
+.whats-new__content {
+  max-height: 60vh;
+  overflow-y: auto;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.whats-new__content h3 {
+  margin: 16px 0 6px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.whats-new__content h3:first-child {
+  margin-top: 0;
+}
+
+.whats-new__content ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.whats-new__content li {
+  margin: 4px 0;
+}
+
+.whats-new__content code {
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+.notice {
+  position: fixed;
+  right: 16px;
+  bottom: 32px;
+  z-index: 20;
+  padding: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--fg-muted);
+  box-shadow: 0 4px 16px rgb(0 0 0 / 10%);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.notice:hover {
+  color: var(--fg);
+}

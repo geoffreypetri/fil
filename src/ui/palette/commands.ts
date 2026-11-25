@@ -20,6 +20,7 @@ export interface CommandDeps {
   openSettings(name: string): void;
   openRename(name: string): void;
   focusSheet(): void;
+  openWhatsNew(): void;
   /** Reports the outcome of an action through the status indicator. */
   report(message: string, isError?: boolean): void;
   onLocaleChange(): void;
@@ -208,6 +209,7 @@ export function rootMode(deps: CommandDeps): PaletteMode {
       ...(canInstall()
         ? [{ id: 'install', label: t('command.install'), run: () => void promptInstall() }]
         : []),
+      { id: 'whats-new', label: t('command.whatsNew'), run: () => deps.openWhatsNew() },
       {
         id: 'version',
         label: t('command.version', { version: VERSION_LABEL }),

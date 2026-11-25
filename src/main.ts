@@ -4,7 +4,7 @@ import { FsAccessStore } from './fs/fsAccessStore';
 import { loadFolder, pickFolder, requestFolderPermission } from './fs/handle';
 import type { FileStore } from './fs/store';
 import { listenForInstallPrompt } from './sw/install';
-import { registerServiceWorker } from './sw/registerSW';
+import { startUpdater } from './sw/updater';
 import { renderSetupScreen, renderUnsupportedScreen } from './ui/setupScreen';
 import { startApp } from './app';
 import { applyStoredTheme } from './ui/theme';
@@ -75,7 +75,7 @@ function start(): void {
   setLocale(storedLocale());
   applyStoredTheme();
   listenForInstallPrompt();
-  registerServiceWorker();
+  startUpdater();
   if (!isBrowserSupported()) {
     renderUnsupportedScreen(root);
     return;

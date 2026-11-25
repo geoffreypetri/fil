@@ -36,6 +36,10 @@ export const en = {
 
   'version.label': 'Version {version}',
 
+  'whatsNew.title': 'What’s new in Fil {version}',
+  'whatsNew.close': 'Close',
+  'whatsNew.updated': 'Updated to {version} · What’s new',
+
   'tags.aliasHint': 'alias #{alias}',
 
   'warning.aliasConflict': '#{alias} is claimed by #{winner} and #{loser}: #{winner} wins until fixed',
@@ -81,6 +85,7 @@ export const en = {
   'command.language': 'Language…',
   'command.closeTopic': 'Close topic view',
   'command.install': 'Install Fil as an app',
+  'command.whatsNew': 'What’s new',
   'command.version': 'Fil {version}',
   'command.versionDetail': 'Version',
 

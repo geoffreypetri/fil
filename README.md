@@ -21,7 +21,7 @@ your browser and makes no network request beyond loading the app.
 | Topic view | Click a tag, or `Ctrl+K` then the tag. `Shift`+click (or `Shift+Enter` in the palette) combines tags with AND. |
 | Back to the journal | `Esc` |
 | Select | `Ctrl+A` selects the current note; press again for the whole day, then the whole journal. |
-| Commands | `Ctrl+K`: filter by tag, open a tag sheet, tag settings, rename a tag, undo the last rename, go to a date, theme, language, notes folder, version. |
+| Commands | `Ctrl+K`: filter by tag, open a tag sheet, tag settings, rename a tag, undo the last rename, go to a date, theme, language, notes folder, what's new, version. |
 | Place the cursor in a tag | `Alt`+click (a plain click opens the topic). |
 
 Days are headed by their date (`2026-11-23`) and each note's time is shown in a column to the
@@ -175,8 +175,14 @@ How it works, in short:
 - The last 30 day files are loaded at startup; older days load as you scroll up.
 - A background **index** of every day file (notes, tags, actions with file, line and time) is
   cached in IndexedDB and invalidated by `lastModified`. Aliases are resolved at query time.
-- A **service worker** caches the app for offline use. New versions download in the background
-  and take over on the next launch; the page never reloads while you are writing.
+- A **service worker** caches the app for offline use and keeps it up to date on its own: the
+  online version is checked at launch, every 30 minutes and when the window regains focus. A new
+  version is downloaded in the background and applied when it cannot disturb you — the window
+  is in the background, you have not typed or clicked for 10 minutes, or the app has just been
+  launched. Edits are saved first, and the cursor, scroll position and topic view are restored.
+  A discreet notice then links to *What's new*.
+- **What's new** (`Ctrl+K` → *What's new*) shows `CHANGELOG.md`, bundled with the app. Add an
+  entry there and bump the version in `package.json` for every user-visible change.
 
 ### Adding a language
 

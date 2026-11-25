@@ -18,6 +18,11 @@ import { dayKeyOf } from './model/paths';
 import { Saver } from './sync/saver';
 import { StatusHub } from './sync/status';
 import { ExternalWatcher } from './sync/watcher';
+import { setBeforeReload } from './sw/updater';
+import { applySession, captureSession, saveSession, takeSession } from './journal/sessionRestore';
+import { consumeUpdateNotice, openWhatsNew } from './ui/whatsNew';
+import { t } from './i18n';
+import { APP_VERSION } from './version';
 import { RenameService } from './tags/renameService';
 import { TagService } from './tags/tagService';
 import { CommandPalette } from './ui/palette/commandPalette';
@@ -109,6 +114,7 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
         openRename: (name) => openRenameDialog(rename, name, () => undefined, focusEditor),
         focusSheet: () => topic.focusSheet(),
         report: (message, isError) => status.set('palette', isError ? 'error' : 'saved', [message]),
+        openWhatsNew: () => openWhatsNew(focusEditor),
         onLocaleChange: () => {
           void saver.flush().then(() => location.reload());
         },
@@ -197,9 +203,41 @@ export function startApp(root: HTMLElement, store: FileStore, options: AppOption
     watcher.start();
     disposers.push(() => watcher.stop());
     await watcher.check();
+
+    // Back from an automatic update: same topic, cursor and scroll position as before.
+    const snapshot = takeSession();
+    if (snapshot) {
+      if (snapshot.topic) await topic.open(snapshot.topic);
+      applySession(view, snapshot);
+    }
+    if (consumeUpdateNotice()) showUpdateNotice();
   })().catch((error: unknown) => {
     status.set('load', 'error', [error instanceof Error ? error.message : String(error)]);
   });
+
+  // Before an automatic update reloads the page: save everything and remember the position.
+  setBeforeReload(async () => {
+    await saver.flush();
+    if (saver.hasPending()) throw new Error('Some files could not be saved');
+    if (context.view) saveSession(captureSession(context.view, topic.tags));
+  });
+  disposers.push(() => setBeforeReload(async () => undefined));
+
+  function showUpdateNotice(): void {
+    const notice = h(
+      'button',
+      {
+        class: 'notice',
+        onclick: () => {
+          notice.remove();
+          openWhatsNew(focusEditor);
+        },
+      },
+      t('whatsNew.updated', { version: APP_VERSION }),
+    );
+    shell.append(notice);
+    setTimeout(() => notice.remove(), 12_000);
+  }
 
   if (import.meta.env.DEV) (window as unknown as { fil: AppContext }).fil = context;
   return () => {
